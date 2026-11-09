@@ -7,10 +7,21 @@ No install, no server: download the file for the version you want and open it.
 
 | Version | File | What it is |
 |---|---|---|
-| **V2** (latest) | [`!Releases/V2/Guyanonymous' Orrery Explorer V2.html`](!Releases/V2/) | Single systems **plus** regions of space up to 100 × 100 × 100 light-years |
+| **V3** (latest) | [`!Releases/V3/Guyanonymous' Orrery Explorer V3.html`](!Releases/V3/) | V2 plus triple/quadruple stars, habitability ranking, travel planner, star motion over time, close-ups and image saving |
+| V2 | [`!Releases/V2/Guyanonymous' Orrery Explorer V2.html`](!Releases/V2/) | Single systems **plus** regions of space up to 100 × 100 × 100 light-years |
 | V1 | [`!Releases/V1/Guyanonymous' Orrery Explorer V1.html`](!Releases/V1/) | The original single-system app (titled "Orrery Workshop") |
 
-Each version folder has a `CHANGELOG.md`. Git tags `v1` and `v2` mark each release.
+Each version folder has a `CHANGELOG.md` with the full history of that version.
+
+## What's new in V3
+
+- **Triple and quadruple stars**, with stable planet zones at every level.
+- **Earth Similarity Index** for every planet, plus a "most Earth-like planets" ranking and filter for each region.
+- **Travel planner** between any two objects: real spacecraft speeds, fractions of light speed (with time aboard the ship), or your own speed.
+- **Star motion** over ±100,000 years with a time slider; the map, distances, travel planner and night sky follow the clock.
+- **Close-ups** of every region object (pulsars with sweeping beams, black holes bending starlight, and more).
+- **Night sky** now shows the system's own planets, moons and companion stars.
+- **Save images** of the region map and the night-sky charts.
 
 ## What V2 does
 
