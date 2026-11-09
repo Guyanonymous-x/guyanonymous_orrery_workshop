@@ -7,11 +7,19 @@ No install, no server: download the file for the version you want and open it.
 
 | Version | File | What it is |
 |---|---|---|
-| **V3** (latest) | [`!Releases/V3/Guyanonymous' Orrery Explorer V3.html`](!Releases/V3/) | V2 plus triple/quadruple stars, habitability ranking, travel planner, star motion over time, close-ups and image saving |
+| **V4** (latest) | [`!Releases/V4/Guyanonymous' Orrery Explorer V4.html`](!Releases/V4/) | V3 plus a 3×3×3 block of neighbouring regions, fuller night skies with every star drawn, and constellations you draw yourself |
+| V3 | [`!Releases/V3/Guyanonymous' Orrery Explorer V3.html`](!Releases/V3/) | V2 plus triple/quadruple stars, habitability ranking, travel planner, star motion over time, close-ups and image saving |
 | V2 | [`!Releases/V2/Guyanonymous' Orrery Explorer V2.html`](!Releases/V2/) | Single systems **plus** regions of space up to 100 × 100 × 100 light-years |
 | V1 | [`!Releases/V1/Guyanonymous' Orrery Explorer V1.html`](!Releases/V1/) | The original single-system app (titled "Orrery Workshop") |
 
 Each version folder has a `CHANGELOG.md` with the full history of that version.
+
+## What's new in V4
+
+- **Neighbouring regions**: a cube picker shows your region and its 26 neighbours (a 3×3×3 block). Click one to move there and explore or edit it.
+- **Fuller night skies**: stars from all 27 regions are included, so skies toward a region's edge are no longer sparse.
+- **Every star drawn**: the sky slider is now **Exposure**. Bright stars are bigger dots; faint ones are dim specks that form a soft haze.
+- **Constellations**: join stars with lines, name the shape and save it with the star system. Show, hide, edit or delete them, with Keep and Undo.
 
 ## What's new in V3
 
