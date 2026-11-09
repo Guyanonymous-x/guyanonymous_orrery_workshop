@@ -1,0 +1,1288 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Orrery Workshop</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: observatory console. Header bar, then three panes: catalogue | orbit plate | inspector. Single dark theme by choice (a star chart reads on black). */
+:root{
+  --ink:#0a0f17;        /* page ground, night sky */
+  --plate:#0e1520;      /* canvas plate */
+  --panel:#111a27;      /* side panes */
+  --raised:#172234;     /* inputs, rows */
+  --line:#24324a;       /* hairlines */
+  --text:#dde5ef;
+  --muted:#8796ab;
+  --accent:#8fb4ff;     /* cool instrument blue */
+  --ok:#6cc58f;
+  --warn:#e9b44c;
+  --bad:#ef6b5f;
+  --hz:#6cc58f;
+  --ice:#9fd0ff;
+  --f-display:"Chakra Petch","Bahnschrift","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{background:var(--ink);color:var(--text);font-family:var(--f-body);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0;box-sizing:border-box}
+*,*::before,*::after{box-sizing:border-box}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{display:flex;flex-direction:column;height:100%;min-height:0}
+header.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding-block:12px;border-bottom:1px solid var(--line)}
+.brand{font-family:var(--f-display);font-weight:600;font-size:18px;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:8px;margin-right:6px}
+.brand svg{display:block}
+.sysctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;flex:1 1 420px;min-width:0}
+.sysctl select,.sysctl input{background:var(--raised);border:1px solid var(--line);border-radius:6px;padding:6px 9px;min-width:0}
+.sysctl input{flex:1 1 160px;font-family:var(--f-display);font-size:15px;letter-spacing:.02em}
+.actions{display:flex;flex-wrap:wrap;gap:6px}
+.btn{background:var(--raised);border:1px solid var(--line);border-radius:6px;padding:6px 11px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:#0a1222;border-color:var(--accent);font-weight:600}
+.btn.danger:hover{border-color:var(--bad);color:var(--bad)}
+.btn.small{padding:3px 8px;font-size:12.5px}
+.btn.on{border-color:var(--accent);color:var(--accent)}
+
+.main{flex:1;min-height:0;display:grid;grid-template-columns:250px minmax(0,1fr) 400px;gap:14px;padding-block:14px}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:10px;min-height:0;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.pane h2{font-family:var(--f-display);font-weight:500;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0;padding:12px 14px 8px}
+.scroll{overflow:auto;min-height:0;flex:1}
+
+/* catalogue */
+.list{display:flex;flex-direction:column;padding:0 8px 8px}
+.item{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;cursor:pointer;border:1px solid transparent;text-align:left;background:none;width:100%}
+.item:hover{background:var(--raised)}
+.item.sel{background:var(--raised);border-color:var(--line)}
+.item .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .sub{display:block;font-size:11.5px;color:var(--muted);font-family:var(--f-mono)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.dot.warn{background:var(--warn)}.dot.error{background:var(--bad)}
+.addrow{display:flex;gap:6px;padding:10px 14px 14px;border-top:1px solid var(--line)}
+.addrow select{flex:1;min-width:0;background:var(--raised);border:1px solid var(--line);border-radius:6px;padding:6px}
+.summary{padding:10px 14px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+.summary b{color:var(--text);font-weight:500}
+
+/* plate */
+.platewrap{position:relative;flex:1;min-height:320px;background:var(--plate)}
+#plate{position:absolute;inset:0;width:100%;height:100%;cursor:grab;touch-action:none}
+#plate.drag{cursor:grabbing}
+.platebar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:8px 10px;border-top:1px solid var(--line);font-size:12.5px}
+.platebar .clock{font-family:var(--f-mono);color:var(--muted);margin-left:auto;font-variant-numeric:tabular-nums}
+.platebar select{background:var(--raised);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+.legend{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--muted);background:rgba(10,15,23,.72);padding:8px 10px;border-radius:8px;border:1px solid var(--line);pointer-events:none}
+.legend div{display:flex;align-items:center;gap:7px}
+.legend canvas{display:block}
+.legend .zone{width:16px;height:8px;border-radius:2px}
+#sizes{display:block;width:100%;height:84px;border-top:1px solid var(--line);background:var(--plate)}
+
+/* inspector */
+.insp{padding:0 14px 16px;display:flex;flex-direction:column;gap:14px}
+.ihead{display:flex;align-items:center;gap:10px;padding-top:4px}
+.ihead h3{font-family:var(--f-display);font-weight:600;font-size:22px;margin:0;letter-spacing:.02em;text-wrap:balance;overflow-wrap:anywhere}
+.ihead .badge{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 9px;border-radius:99px;border:1px solid var(--line)}
+.pill.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 45%,transparent)}
+.pill.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
+.pill.error{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
+.desc{font-size:14px;line-height:1.6;max-width:65ch;margin:0;color:#cfd8e4}
+.issues{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.issues li{font-size:13px;padding:7px 10px;border-radius:6px;border-left:3px solid var(--muted);background:var(--raised)}
+.issues li.error{border-left-color:var(--bad)}
+.issues li.warn{border-left-color:var(--warn)}
+.issues li.note{border-left-color:var(--accent)}
+.issues li b{font-weight:600;text-transform:uppercase;font-size:10.5px;letter-spacing:.1em;margin-right:6px}
+.issues li.error b{color:var(--bad)}.issues li.warn b{color:var(--warn)}.issues li.note b{color:var(--accent)}
+.sect{font-family:var(--f-display);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:5px;margin:4px 0 0}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+.field{display:flex;flex-direction:column;gap:3px;min-width:0}
+.field.wide{grid-column:1/-1}
+.field label{font-size:12px;color:var(--muted)}
+.field label .u{font-family:var(--f-mono);font-size:11px;color:#6f7f96;margin-left:4px}
+.field input,.field select,.field textarea{background:var(--raised);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%;font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums}
+.field input[type=text],.field textarea{font-family:var(--f-body);font-size:14px}
+.field textarea{min-height:64px;resize:vertical}
+.field input::placeholder{color:#62728a}
+.field .chk{display:flex;align-items:center;gap:8px;font-family:var(--f-body);font-size:13px;color:var(--text);padding:6px 0}
+.field .chk input{width:auto}
+table.derived{width:100%;border-collapse:collapse;font-size:12.5px}
+table.derived td{padding:5px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+table.derived td:first-child{color:var(--muted);width:42%}
+table.derived td.v{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+table.derived td.alt{font-family:var(--f-mono);color:#7e8ea5;text-align:right;font-size:11.5px}
+.moon{border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.moon .mh{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.moon .mout{font-size:12.5px;color:#b9c4d3;line-height:1.5}
+.irow{display:flex;gap:6px;flex-wrap:wrap}
+details.more summary{cursor:pointer;color:var(--muted);font-size:12.5px}
+details.more[open] summary{margin-bottom:8px}
+
+/* overlay */
+.overlay{position:fixed;inset:0;background:rgba(4,7,12,.72);display:flex;align-items:center;justify-content:center;z-index:30;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.dialog{background:var(--panel);border:1px solid var(--line);border-radius:12px;width:min(820px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+.dialog .dh{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+.dialog .dh h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:18px}
+.tabs{display:flex;gap:4px;padding:10px 16px 0;flex-wrap:wrap}
+.tab{background:none;border:1px solid var(--line);border-bottom:none;border-radius:6px 6px 0 0;padding:6px 12px;cursor:pointer;color:var(--muted)}
+.tab.on{background:var(--raised);color:var(--text)}
+.dialog .db{padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px;overflow:auto;min-height:0}
+.dialog .db p{margin:0;max-width:70ch;color:#c4cedb;font-size:13.5px}
+.dialog textarea{width:100%;min-height:260px;background:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:var(--f-mono);font-size:12px;line-height:1.5;white-space:pre;overflow:auto}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--raised);border:1px solid var(--line);padding:9px 14px;border-radius:8px;z-index:40;font-size:13px}
+
+@media (max-width:1180px){
+  .main{grid-template-columns:230px minmax(0,1fr)}
+  .pane.inspector{grid-column:1/-1}
+  .app{height:auto}
+  html,body{height:auto}
+  .platewrap{min-height:460px}
+}
+@media (max-width:720px){
+  .main{grid-template-columns:minmax(0,1fr)}
+  .platewrap{min-height:380px}
+  .fields{grid-template-columns:1fr}
+  .legend{font-size:10.5px;padding:6px 8px}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+<div class="app">
+  <header class="bar">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="3.2" fill="#f2c66d"/><ellipse cx="11" cy="11" rx="9.5" ry="4.2" fill="none" stroke="#8fb4ff" stroke-width="1.2" transform="rotate(-24 11 11)"/><circle cx="19.2" cy="7.3" r="1.6" fill="#8fb4ff"/></svg>
+      Orrery Workshop
+    </div>
+    <div class="sysctl">
+      <select id="sysSelect" aria-label="Choose system"></select>
+      <input id="sysName" type="text" aria-label="System name" spellcheck="false">
+    </div>
+    <div class="actions">
+      <button class="btn" id="btnNew" type="button">New system</button>
+      <button class="btn" id="btnGen" type="button">Generate random</button>
+      <button class="btn" id="btnImport" type="button">Import</button>
+      <button class="btn primary" id="btnExport" type="button">Save / Export</button>
+      <button class="btn danger" id="btnDel" type="button">Delete</button>
+      <input id="fileIn" type="file" accept=".json,application/json" hidden>
+    </div>
+  </header>
+
+  <div class="main">
+    <section class="pane catalogue">
+      <h2>Catalogue</h2>
+      <div class="scroll"><div class="list" id="list"></div></div>
+      <div class="summary" id="summary"></div>
+      <div class="addrow">
+        <select id="addType" aria-label="Object type to add">
+          <option value="terrestrial">Terrestrial planet</option>
+          <option value="superearth">Super-Earth</option>
+          <option value="subneptune">Sub-Neptune</option>
+          <option value="icegiant">Ice giant</option>
+          <option value="gasgiant">Gas giant</option>
+          <option value="dwarf">Dwarf planet</option>
+          <option value="belt">Asteroid belt</option>
+          <option value="comet">Comet</option>
+        </select>
+        <button class="btn" id="btnAdd" type="button">Add</button>
+      </div>
+    </section>
+
+    <section class="pane">
+      <div class="platewrap">
+        <canvas id="plate" aria-label="Top-down orbit map of the system"></canvas>
+        <div class="legend" id="legend"></div>
+      </div>
+      <canvas id="sizes" aria-label="Relative sizes of bodies"></canvas>
+      <div class="platebar">
+        <button class="btn small" id="btnPlay" type="button">Play</button>
+        <select id="speed" aria-label="Simulation speed">
+          <option value="1">1 day / s</option>
+          <option value="10">10 days / s</option>
+          <option value="60" selected>60 days / s</option>
+          <option value="365">1 year / s</option>
+          <option value="3650">10 years / s</option>
+        </select>
+        <button class="btn small on" id="btnLog" type="button" title="Logarithmic distance scale">Log scale</button>
+        <button class="btn small" id="btnZin" type="button" aria-label="Zoom in">+</button>
+        <button class="btn small" id="btnZout" type="button" aria-label="Zoom out">−</button>
+        <button class="btn small" id="btnFit" type="button">Fit</button>
+        <button class="btn small on" id="btnLegend" type="button">Legend</button>
+        <span class="clock" id="clock"></span>
+      </div>
+    </section>
+
+    <section class="pane inspector">
+      <h2>Inspector</h2>
+      <div class="scroll"><div class="insp" id="insp"></div></div>
+    </section>
+  </div>
+</div>
+
+<div class="overlay" id="exportOv" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="exTitle">
+    <div class="dh"><h3 id="exTitle">Save &amp; export</h3><button class="btn small" id="exClose" type="button">Close</button></div>
+    <div class="tabs" id="exTabs"></div>
+    <div class="db">
+      <p id="exInfo"></p>
+      <textarea id="exText" readonly spellcheck="false" aria-label="Export preview"></textarea>
+      <div class="irow" id="exBtns"></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/* ============================================================
+   PHYSICS — all formulas in one place.
+   Units: masses in M☉ / M⊕ / lunar masses, distances in AU or km,
+   luminosity in L☉, temperatures in K, time in years / days.
+   ============================================================ */
+const C = {
+  AU_KM:1.495978707e8, RSUN_KM:695700, RSUN_AU:695700/1.495978707e8, REARTH_KM:6371,
+  MSUN_ME:332946, MMOON_ME:0.0123, MEARTH_KG:5.972e24, MSUN_KG:1.989e30,
+  G:6.674e-11, KB:1.380649e-23, AMU:1.66054e-27, TSUN:5772, UNIVERSE_GYR:13.8, RJUP_RE:11.21, MJUP_ME:317.8
+};
+const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+const cbrt=Math.cbrt, log10=Math.log10, sqrt=Math.sqrt, PI=Math.PI, D2R=PI/180;
+
+/* --- Stars (main sequence) --- */
+function msLuminosity(M){ // piecewise mass–luminosity relation (L☉)
+  if(M<0.43) return 0.23*Math.pow(M,2.3);
+  if(M<2) return Math.pow(M,4);
+  if(M<55) return 1.4*Math.pow(M,3.5);
+  return 32000*M;
+}
+function msRadius(M){ return M<1?Math.pow(M,0.8):Math.pow(M,0.57); } // R☉
+function spectralType(T){
+  const bands=[["O",30000,52000],["B",10000,30000],["A",7500,10000],["F",6000,7500],["G",5200,6000],["K",3700,5200],["M",2300,3700]];
+  for(const [c,lo,hi] of bands){ if(T>=lo||c==="M"){ const sub=clamp(Math.floor(10*(hi-T)/(hi-lo)),0,9); return {cls:c,sub,code:c+sub+"V"}; } }
+}
+function bolometricCorrection(T){ // Torres (2010) fit to Flower (1996)
+  const x=log10(T);
+  if(x<3.70) return -0.190537291496456e5+0.155144866764412e5*x-0.421278819301717e4*x*x+0.381476328422343e3*x**3;
+  if(x<3.90) return -0.370510203809015e5+0.385672629965804e5*x-0.150651486316025e5*x*x+0.261724637119416e4*x**3-0.170623810323864e3*x**4;
+  return -0.118115450538963e6+0.137145973583929e6*x-0.636233812100225e5*x*x+0.147412923562646e5*x**3-0.170587278406872e4*x**4+0.788731721804990e2*x**5;
+}
+function kopparapuSeff(T,k){ // Kopparapu et al. (2013) habitable-zone flux limits
+  const co={rv:[1.7763,1.4335e-4,3.3954e-9,-7.6364e-12,-1.1950e-15],rg:[1.0385,1.2456e-4,1.4612e-8,-7.6345e-12,-1.7511e-15],
+            mg:[0.3507,5.9578e-5,1.6707e-9,-3.0058e-12,-5.1925e-16],em:[0.3207,5.4471e-5,1.5275e-9,-2.1709e-12,-3.8282e-16]}[k];
+  const t=clamp(T,2600,7200)-5780;
+  return co[0]+co[1]*t+co[2]*t*t+co[3]*t**3+co[4]*t**4;
+}
+function kelvinRGB(T){ // approximate blackbody colour
+  const t=T/100; let r,g,b;
+  if(t<=66){ r=255; g=99.4708025861*Math.log(t)-161.1195681661; b=t<=19?0:138.5177312231*Math.log(t-10)-305.0447927307; }
+  else { r=329.698727446*Math.pow(t-60,-0.1332047592); g=288.1221695283*Math.pow(t-60,-0.0755148492); b=255; }
+  return [r,g,b].map(v=>Math.round(clamp(v,0,255)));
+}
+function starModel(s){
+  const M=+s.mass, age=+s.age, feh=+s.feh, issues=[];
+  const Lms=msLuminosity(M), Rms=msRadius(M);
+  const tau=10*M/Lms;                              // main-sequence lifetime, Gyr
+  const frac=clamp(age/tau,0,1);
+  const Lauto=Lms*(1+0.4*(frac-0.46)), Rauto=Rms*(1+0.2*(frac-0.46)); // brightens & swells with age; Sun = 1 at 4.6 Gyr
+  const L=num(s.lumOverride)||Lauto, R=num(s.radiusOverride)||Rauto;
+  const T=C.TSUN*Math.pow(L/(R*R),0.25);
+  const sp=spectralType(T);
+  const Mbol=4.74-2.5*log10(L), BC=bolometricCorrection(T), MV=Mbol-BC;
+  const logg=4.438+log10(M)-2*log10(R), rho=1.41*M/(R*R*R);
+  const hz={rv:sqrt(L/kopparapuSeff(T,"rv")),rg:sqrt(L/kopparapuSeff(T,"rg")),mg:sqrt(L/kopparapuSeff(T,"mg")),em:sqrt(L/kopparapuSeff(T,"em"))};
+  const frost=2.7*sqrt(L), dust=0.0345*sqrt(L), disk=50*M, lockR=0.4*cbrt(M)*Math.pow(Math.max(age,0.1)/4.5,1/6);
+  const giantRate=clamp(0.1*M*Math.pow(10,2*feh),0.002,0.6);
+
+  if(M<0.08) issues.push(["error","Below about 0.08 M☉ the core never gets hot enough to fuse hydrogen. This would be a brown dwarf, not a star."]);
+  if(M>150) issues.push(["error","Stars above roughly 150 M☉ are not observed; radiation pressure blows the excess mass away during formation."]);
+  if(age<=0) issues.push(["error","Age must be greater than zero."]);
+  if(age>C.UNIVERSE_GYR) issues.push(["error",`An age of ${f(age,3)} Gyr is older than the universe (13.8 Gyr).`]);
+  else if(age>tau) issues.push(["error",`A ${f(M,3)} M☉ star runs out of core hydrogen after about ${fGyr(tau)}. At ${f(age,3)} Gyr it would already be a giant or a stellar remnant. This tool models main-sequence stars, so lower the age or the mass.`]);
+  else if(frac>0.9) issues.push(["warn",`At ${Math.round(frac*100)}% of its main-sequence life the star is about to swell into a subgiant; its luminosity is changing fast.`]);
+  if(age<0.05&&age>0) issues.push(["note","Younger than 50 Myr: planets would still be forming or cooling, and the disk may not have cleared."]);
+  if(M>=8&&age<=tau) issues.push(["note",`Stars above about 8 M☉ end as supernovae. This one lives only ${fGyr(tau)}, which is short for rocky planets to finish forming and too short for complex life.`]);
+  else if(tau<1) issues.push(["note",`Its main-sequence life is only ${fGyr(tau)}. On Earth, simple life took nearly a billion years to appear.`]);
+  if(feh<-1) issues.push(["warn","Very metal-poor ([Fe/H] < −1): little rock and ice in the disk, so planets, especially giants, are rare around stars like this."]);
+  if(feh>0.6) issues.push(["warn","[Fe/H] above +0.6 is beyond almost all observed stars."]);
+  if(sp.cls==="M") issues.push(["note","Red dwarfs flare often, especially when young. Planets in its close-in habitable zone are likely tidally locked and exposed to strong flares."]);
+  if(num(s.lumOverride)&&(L/Lauto>3||L/Lauto<1/3)) issues.push(["warn",`The luminosity you entered differs from a main-sequence ${f(M,3)} M☉ star (≈${f(Lauto,3)} L☉) by more than 3×.`]);
+  if(num(s.radiusOverride)&&(R/Rauto>2||R/Rauto<0.5)) issues.push(["warn",`The radius you entered differs from a main-sequence ${f(M,3)} M☉ star (≈${f(Rauto,3)} R☉) by more than 2×.`]);
+  if(T<2300||T>52000) issues.push(["error",`Surface temperature ${Math.round(T)} K is outside the range of real main-sequence stars (about 2,300–50,000 K). Check the radius or luminosity.`]);
+
+  return {M,age,feh,L,R,T,Lauto,Rauto,tau,frac,sp,Mbol,BC,MV,logg,rho,hz,frost,dust,disk,lockR,giantRate,issues,rgb:kelvinRGB(T)};
+}
+
+/* --- Planets and other bodies --- */
+const TYPES={
+  terrestrial:{label:"Terrestrial planet",soft:[0.01,2],hard:[1e-4,15],rocky:true},
+  superearth:{label:"Super-Earth",soft:[1.5,10],hard:[0.5,20],rocky:true},
+  subneptune:{label:"Sub-Neptune",soft:[2,20],hard:[1,40]},
+  icegiant:{label:"Ice giant",soft:[8,60],hard:[3,150]},
+  gasgiant:{label:"Gas giant",soft:[20,4130],hard:[10,4130],giant:true},
+  dwarf:{label:"Dwarf planet",soft:[2e-5,0.05],hard:[5e-6,0.1],rocky:true},
+  belt:{label:"Asteroid belt"},
+  comet:{label:"Comet"}
+};
+const COMP={iron:{label:"Iron-rich (Mercury-like)",k:0.85,rho:"high"},earth:{label:"Earth-like rock & metal",k:1},rockice:{label:"Rock & ice mix",k:1.1},water:{label:"Water world (≈50% water)",k:1.25}};
+const GASES=[["H₂",2],["He",4],["H₂O",18],["N₂",28],["O₂",32],["CO₂",44]];
+
+function autoRadius(b,Teq){ // R⊕
+  const M=b.mass;
+  switch(b.type){
+    case "terrestrial": case "superearth": case "dwarf": return (COMP[b.comp]||COMP.earth).k*Math.pow(M,0.27);
+    case "subneptune": case "icegiant": return 0.808*Math.pow(M,0.589); // Chen & Kipping (2017) Neptunian branch
+    case "gasgiant": {
+      let R=M<=318?11.2*Math.pow(M/318,0.18):11.2*Math.pow(M/318,-0.04);
+      if(Teq>1000) R*=1+0.25*clamp((Teq-1000)/1000,0,1); // irradiation inflation of hot Jupiters
+      return R;
+    }
+  }
+  return 1;
+}
+function periodYears(a,Mstar,mME){ return sqrt(a*a*a/(Mstar+(mME||0)/C.MSUN_ME)); }
+function teqK(L,dAU,A){ return 278.6*Math.pow(1-A,0.25)*Math.pow(L,0.25)/sqrt(dAU); }
+function tempWord(T){ return T>1000?"scorching":T>500?"hot":T>320?"warm":T>180?"temperate":T>90?"cold":"frigid"; }
+
+function bodyModel(b,sm){
+  const t=b.type, issues=[], out={type:t,issues};
+  if(t==="belt"){
+    const ai=+b.inner, ao=+b.outer;
+    if(!(ai>0)||!(ao>ai)) issues.push(["error","The outer edge must be farther out than the inner edge."]);
+    out.Pin=periodYears(ai,sm.M); out.Pout=periodYears(ao,sm.M);
+    out.Tin=teqK(sm.L,ai,0.1); out.Tout=teqK(sm.L,ao,0.1);
+    out.icy=ai>sm.frost; out.mixed=ai<sm.frost&&ao>sm.frost;
+    out.q=ai; out.Q=ao; out.a=(ai+ao)/2;
+    if(b.mass>0.1) issues.push(["warn",`${f(b.mass,3)} M⊕ is a lot of loose material. Without a strong disturber nearby (a giant planet), it would have collected into a planet.`]);
+    if(ai<sm.dust) issues.push(["error",`Inside ${f(sm.dust,3)} AU the starlight is hot enough (≈1,500 K) to vaporize rock.`]);
+    if(ai<sm.R*C.RSUN_AU*2) issues.push(["error","The belt starts inside or just above the star."]);
+    return out;
+  }
+  const a=+b.a, e=+b.e, A=+b.albedo;
+  const q=a*(1-e), Q=a*(1+e);
+  out.a=a; out.q=q; out.Q=Q;
+  if(!(a>0)) issues.push(["error","Semi-major axis must be greater than zero."]);
+  if(!(e>=0&&e<1)) issues.push(["error","Eccentricity must be at least 0 and less than 1; at 1 or above the object is not bound to the star."]);
+  const dEff=a*Math.pow(Math.max(1-e*e,1e-6),0.25); // flux-averaged distance
+  out.S=sm.L/(dEff*dEff); out.Teq=teqK(sm.L,dEff,A); out.TeqPeri=teqK(sm.L,q,A); out.TeqApo=teqK(sm.L,Q,A);
+  out.Pyr=periodYears(a,sm.M,t==="comet"?0:b.mass); out.Pd=out.Pyr*365.25;
+  out.vOrb=29.78*sqrt(sm.M/a);
+  const Rstar=sm.R*C.RSUN_AU;
+  if(q<=Rstar*1.05) issues.push(["error",`Its closest approach (${f(q,3)} AU) is inside the star, which has a radius of ${f(Rstar,3)} AU.`]);
+
+  if(t==="comet"){
+    const Rk=+b.radiusKm, rho=0.6;
+    out.Rkm=Rk; out.massKg=4/3*PI*Math.pow(Rk*1e3,3)*rho*1000; out.mass=out.massKg/C.MEARTH_KG;
+    out.activeAt=3*sqrt(sm.L); out.active=q<out.activeAt;
+    if(e<0.3) issues.push(["warn","Comets usually have elongated orbits (e > 0.3). A near-circular icy body is better described as a dwarf planet, centaur or Kuiper-belt object."]);
+    if(Rk>100) issues.push(["warn","A nucleus over 100 km across is far larger than any known comet; objects that big are classed as dwarf planets or centaurs."]);
+    if(q<sm.R*C.RSUN_AU*3) issues.push(["note","A sungrazer: it will likely break up or vaporize at perihelion."]);
+    if(a>100000) issues.push(["warn","Beyond about 100,000 AU the galaxy's tides and passing stars strip objects away from their star."]);
+    return out;
+  }
+
+  const ty=TYPES[t], M=+b.mass;
+  out.mass=M;
+  const Rauto=autoRadius(b,out.Teq);
+  const R=num(b.radiusOverride)||Rauto;
+  out.R=R; out.Rauto=Rauto; out.Rkm=R*C.REARTH_KM;
+  out.rho=5.514*M/(R*R*R); out.g=M/(R*R); out.vesc=11.186*sqrt(M/R);
+  out.hill=q*cbrt(M/(3*sm.M*C.MSUN_ME));
+  out.hillKm=out.hill*C.AU_KM;
+  out.rocheStar=2.44*Rstar*cbrt(sm.rho/out.rho);
+  // breakup spin period (hours)
+  out.Pbreak=2*PI*sqrt(Math.pow(R*C.REARTH_KM*1e3,3)/(C.G*M*C.MEARTH_KG))/3600;
+  const rot=+b.rotation;
+  out.rot=rot;
+  if(rot&&Math.abs(1/rot-1/(out.Pd*24))>1e-12){ out.solarDay=1/(1/rot-1/(out.Pd*24)); } else out.solarDay=Infinity;
+  out.locked=(ty.rocky||t==="subneptune")&&a<sm.lockR;
+  out.inHZ=out.Teq>0&&dEff>=sm.hz.rg&&dEff<=sm.hz.mg; out.inOptHZ=dEff>=sm.hz.rv&&dEff<=sm.hz.em;
+  out.beyondFrost=a>sm.frost;
+  // atmosphere retention: escape velocity vs 6× rms speed at exosphere temperature
+  const Texo=ty.giant||t==="icegiant"?out.Teq:Math.max(out.Teq*4,300);
+  out.gases=GASES.map(([n,mu])=>{const vrms=sqrt(3*C.KB*Texo/(mu*C.AMU))/1000; return [n,out.vesc>6*vrms];});
+
+  // ---- checks
+  if(M>4130) issues.push(["error",`At ${f(M/C.MJUP_ME,3)} Jupiter masses (above ≈13 MJ) the core fuses deuterium. This is a brown dwarf, not a planet.`]);
+  if(M>26000) issues.push(["error","Above about 80 Jupiter masses this would be a star."]);
+  if(M<=0) issues.push(["error","Mass must be greater than zero."]);
+  if(M>0&&M<4130){
+    if(M<ty.hard[0]||M>ty.hard[1]) issues.push(["warn",`${f(M,3)} M⊕ is outside the range for a ${ty.label.toLowerCase()} (about ${f(ty.soft[0],2)}–${f(ty.soft[1],3)} M⊕). Consider a different type.`]);
+    else if(M<ty.soft[0]||M>ty.soft[1]) issues.push(["note",`${f(M,3)} M⊕ is at the edge of the usual range for a ${ty.label.toLowerCase()} (${f(ty.soft[0],2)}–${f(ty.soft[1],3)} M⊕).`]);
+  }
+  if(ty.rocky&&M>10&&t!=="dwarf") issues.push(["warn","A rocky core above ~10 M⊕ that forms while the disk still has gas almost always captures a thick hydrogen envelope."]);
+  if(t==="dwarf"&&M<2e-5) issues.push(["warn","This is probably too small for gravity to pull it round, so it would be an irregular asteroid rather than a dwarf planet."]);
+  if(out.rho>18) issues.push(["error",`A mean density of ${f(out.rho,3)} g/cm³ is higher than pure iron under pressure allows for a body this size. Increase the radius or lower the mass.`]);
+  if(out.rho<0.05) issues.push(["error",`A mean density of ${f(out.rho,3)} g/cm³ is too low to hold together. Shrink the radius or raise the mass.`]);
+  else if(out.rho<0.2) issues.push(["warn","Extremely low density: a rare \"super-puff\". Only a few are known, and they need a young, hot, inflated atmosphere."]);
+  if(num(b.radiusOverride)&&(R/Rauto>1.6||R/Rauto<0.6)) issues.push(["note",`Your radius differs from the mass–radius model (${f(Rauto,3)} R⊕) by more than 60%. Fine for an unusual composition; check the density.`]);
+  if(q<out.rocheStar) issues.push(["error",`At closest approach (${f(q,3)} AU) it is inside the star's Roche limit (${f(out.rocheStar,3)} AU). Tidal forces would tear it apart.`]);
+  else if(q<sm.dust&&!ty.giant) issues.push(["note","Closer than the dust-sublimation line: it would be a molten lava world, and probably formed farther out and migrated inward."]);
+  if(rot&&Math.abs(rot)<out.Pbreak) issues.push(["error",`A ${f(Math.abs(rot),3)}-hour rotation is faster than breakup speed (${f(out.Pbreak,3)} h): the equator would fly apart.`]);
+  else if(rot&&Math.abs(rot)<out.Pbreak*1.6) issues.push(["warn","Rotation is close to breakup speed. The planet would be strongly flattened at the poles."]);
+  if(out.locked&&rot&&Math.abs(Math.abs(rot)-out.Pd*24)/(out.Pd*24)>0.05) issues.push(["note",`This close to the star, tides would probably have locked its spin to its orbit (rotation ≈ ${f(out.Pd*24,4)} h, one face always toward the star).`]);
+  if(t==="gasgiant"&&!out.beyondFrost) issues.push(["note",`It sits inside the frost line (${f(sm.frost,3)} AU). Gas giants form beyond it, so this one migrated inward, like the "hot Jupiters" found around other stars.`]);
+  if(t==="icegiant"&&a<sm.frost*0.5) issues.push(["note","Ice giants form far out; at this distance it must have migrated, and its envelope would be slowly evaporating."]);
+  if(b.comp==="water"&&ty.rocky&&out.Teq>400) issues.push(["warn","A water world this hot would have a steam atmosphere rather than oceans, and would lose its water over time."]);
+  if(a>sm.disk&&t!=="dwarf") issues.push(["note",`Farther out than planets normally form around this star (≈${f(sm.disk,3)} AU). It may have been scattered outward.`]);
+  if(Math.abs(+b.inc)>30&&t!=="dwarf") issues.push(["note","Large inclination: planets form in a flat disk, so this tilt implies a past gravitational encounter."]);
+  return out;
+}
+
+function moonModel(m,b,bm,sm){
+  const issues=[], Mme=m.mass*C.MMOON_ME;
+  const rho=m.comp==="icy"?1.9:3.3;
+  const Rkm=cbrt(3*Mme*C.MEARTH_KG/(4*PI*rho*1000))/1000;
+  const a=+m.a, Rp=bm.Rkm;
+  const P=2*PI*sqrt(Math.pow(a*1e3,3)/(C.G*(b.mass+Mme)*C.MEARTH_KG))/86400;
+  const roche=2.44*Rp*cbrt(bm.rho/rho);
+  const hill=bm.hillKm;
+  if(Mme>=b.mass) issues.push(["error","The moon is as massive as its planet, so the planet would be orbiting it."]);
+  else if(Mme/b.mass>0.1) issues.push(["note","Over 10% of the planet's mass: effectively a double planet; both orbit a point between them."]);
+  if(a<=Rp) issues.push(["error","Orbit is inside the planet."]);
+  else if(a<roche) issues.push(["error",`Inside the planet's Roche limit (${fk(roche)}): tides would grind it into a ring.`]);
+  if(a>0.5*hill) issues.push(["error",`Beyond half the planet's Hill sphere (${fk(0.5*hill)}): the star's gravity would pull it away.`]);
+  else if(a>0.33*hill) issues.push(["warn","In the outer Hill sphere; only stable on a retrograde orbit."]);
+  if(m.comp==="icy"&&bm.Teq>300) issues.push(["note","An icy moon this close to the star would slowly lose its ice."]);
+  return {Mme,Rkm,P,roche,hill,issues};
+}
+
+function analyse(sys){
+  const sm=starModel(sys.star);
+  const res={star:sm,bodies:{},moons:{}};
+  for(const b of sys.bodies){
+    const bm=bodyModel(b,sm); res.bodies[b.id]=bm;
+    if(b.moons&&bm.Rkm&&b.type!=="belt"&&b.type!=="comet") for(const m of b.moons){ res.moons[m.id]=moonModel(m,b,bm,sm); }
+  }
+  // orbital spacing between neighbouring planets (mutual Hill radii)
+  const pl=sys.bodies.filter(b=>b.type!=="belt"&&b.type!=="comet"&&res.bodies[b.id].a>0).sort((x,y)=>x.a-y.a);
+  for(let i=0;i<pl.length-1;i++){
+    const b1=pl[i], b2=pl[i+1], m1=res.bodies[b1.id], m2=res.bodies[b2.id];
+    const RH=cbrt((b1.mass+b2.mass)/(3*sm.M*C.MSUN_ME))*(b1.a+b2.a)/2;
+    const D=(b2.a-b1.a)/RH;
+    m1.spacingOut=D; m2.spacingIn=D;
+    const dwarf=b1.type==="dwarf"||b2.type==="dwarf";
+    if(m1.Q>m2.q){
+      const msg=(o)=>`Its orbit crosses ${o}'s. Without a protecting resonance (as with Pluto and Neptune) they would collide or scatter.`;
+      const lv=dwarf?"warn":"error";
+      m1.issues.push([lv,msg(b2.name)]); m2.issues.push([lv,msg(b1.name)]);
+    } else if(D<2*sqrt(3)){
+      const msg=(o)=>`Only ${f(D,2)} mutual Hill radii from ${o}. Below 3.5 the orbits go chaotic within a few orbits.`;
+      m1.issues.push([dwarf?"warn":"error",msg(b2.name)]); m2.issues.push([dwarf?"warn":"error",msg(b1.name)]);
+    } else if(D<7&&!dwarf){
+      const msg=(o)=>`${f(D,2)} mutual Hill radii from ${o}. Planet pairs usually need about 7–10 or more to stay stable for billions of years.`;
+      m1.issues.push(["warn",msg(b2.name)]); m2.issues.push(["warn",msg(b1.name)]);
+    }
+  }
+  // belts vs planets
+  for(const b of sys.bodies.filter(x=>x.type==="belt")){
+    const bm=res.bodies[b.id];
+    for(const p of pl){ const pm=res.bodies[p.id];
+      if(p.type==="dwarf") continue;
+      const reach=3.5*pm.hill;
+      if(p.a+reach>b.inner&&p.a-reach<b.outer) bm.issues.push(["warn",`${p.name} sits within or right at the edge of the belt and would sweep that zone clear.`]);
+    }
+  }
+  // star-level checks on the whole system
+  const totalMass=pl.reduce((s,b)=>s+b.mass,0);
+  if(totalMass>0.05*sm.M*C.MSUN_ME) res.star.issues.push(["warn",`The planets total ${f(totalMass,3)} M⊕, more than 5% of the star's mass; protoplanetary disks rarely hold that much.`]);
+  return res;
+}
+
+/* --- formatting helpers --- */
+function num(v){ const x=parseFloat(v); return isFinite(x)&&x>0?x:0; }
+function f(x,s=3){
+  if(x===Infinity) return "∞";
+  if(!isFinite(x)) return "—";
+  if(x===0) return "0";
+  const ax=Math.abs(x);
+  if(ax>=1e6||ax<1e-3) { const [m,e]=x.toExponential(s-1).split("e"); return `${+m}×10${sup(+e)}`; }
+  let v=+x.toPrecision(s);
+  return ax>=1000?v.toLocaleString("en-US",{maximumFractionDigits:0}):String(v);
+}
+function sup(n){ return String(n).split("").map(c=>"⁰¹²³⁴⁵⁶⁷⁸⁹"["0123456789".indexOf(c)]||(c==="-"?"⁻":c)).join(""); }
+function fk(km){ return km>1e6?f(km/1e6,3)+" million km":f(km,3)+" km"; }
+function fGyr(g){ return g<1?f(g*1000,3)+" million years":f(g,3)+" billion years"; }
+function fDays(d){ return d<2?f(d*24,3)+" hours":d<700?f(d,3)+" days":f(d/365.25,3)+" years"; }
+function cTemp(K){ return `${f(K,3)} K (${Math.round(K-273.15)} °C)`; }
+
+/* --- natural-language descriptions --- */
+const STARWORD={O:["blue","blue main-sequence star"],B:["blue-white","blue-white main-sequence star"],A:["white","white main-sequence star"],F:["yellow-white","yellow-white dwarf"],G:["yellow-white","yellow dwarf"],K:["orange","orange dwarf"],M:["deep orange-red","red dwarf"]};
+function describeStar(s,sm,sys){
+  const [hue,kind]=STARWORD[sm.sp.cls];
+  const used=Math.round(sm.frac*100);
+  let t=`${s.name} is a ${sm.sp.code} ${kind}. It has ${f(sm.M)} times the Sun's mass and is ${f(sm.R)} times the Sun's radius, with a surface temperature of about ${f(sm.T,4)} K, so its light would look ${hue} to the eye. It gives off ${f(sm.L)} times the Sun's energy. `;
+  t+=`At ${f(sm.age)} billion years old it has used about ${used}% of its ${fGyr(sm.tau)} of hydrogen-burning life`;
+  t+=sm.tau>C.UNIVERSE_GYR*2?", a lifespan longer than the universe's present age. ":". ";
+  const metal=Math.pow(10,sm.feh);
+  t+=`Its metallicity ([Fe/H] = ${sm.feh>=0?"+":""}${f(sm.feh,2)}) means it holds ${f(metal,2)} times the Sun's share of elements heavier than helium; roughly ${Math.round(sm.giantRate*100)}% of stars like it host a gas giant. `;
+  t+=`A planet with an Earth-like atmosphere could keep liquid water between ${f(sm.hz.rg)} and ${f(sm.hz.mg)} AU (the conservative habitable zone; ${f(sm.hz.rv)}–${f(sm.hz.em)} AU in the optimistic case). Water ice condenses beyond about ${f(sm.frost)} AU, the frost line, where giant planets form most easily.`;
+  const n=sys.bodies.length;
+  if(n) t+=` It has ${n} catalogued companion${n>1?"s":""}.`;
+  return t;
+}
+function eccText(bm,e){
+  if(e<0.02) return "on a nearly circular orbit";
+  if(e<0.1) return `on a slightly elongated orbit (${f(bm.q)}–${f(bm.Q)} AU)`;
+  return `on a markedly eccentric orbit that swings between ${f(bm.q)} and ${f(bm.Q)} AU, so its distance drives its seasons as much as its tilt does`;
+}
+function densityWord(r){ return r>7?"metal-rich":r>4.5?"rock-and-metal, like Earth":r>3?"rocky":r>2?"a rock-and-ice mixture":r>1?"ice-rich, or rock wrapped in a thick gas envelope":"gas-dominated"; }
+function describeBody(b,bm,sm,star){
+  const t=b.type;
+  if(t==="belt"){
+    return `${b.name} is a belt of ${bm.icy?"icy":bm.mixed?"rocky and icy":"rocky"} debris between ${f(b.inner)} and ${f(b.outer)} AU from ${star.name}, with a total mass of about ${f(b.mass)} Earth masses (${f(b.mass/0.0004,2)} times the Solar System's main asteroid belt). Objects at its inner edge circle the star every ${f(bm.Pin)} years and those at the outer edge every ${f(bm.Pout)} years. Typical surface temperatures run from ${Math.round(bm.Tin)} K down to ${Math.round(bm.Tout)} K${bm.mixed?"; the frost line runs through it, so the inner part is dry rock and the outer part holds water ice":""}.`;
+  }
+  if(t==="comet"){
+    return `${b.name} is a comet with a nucleus about ${f(bm.Rkm*2)} km across. It travels ${eccText(bm,+b.e)}, completing one orbit every ${fDays(bm.Pd)}. ${bm.active?`Inside about ${f(bm.activeAt)} AU its ice begins to sublimate, so near perihelion it grows a coma and a tail that always points away from ${star.name}; at closest approach it reaches roughly ${Math.round(bm.TeqPeri)} K.`:`It never comes closer than ${f(bm.q)} AU, too cold for its ice to sublimate, so it stays an inactive, dark snowball.`}`;
+  }
+  const ty=TYPES[t], giant=t==="gasgiant"||t==="icegiant"||t==="subneptune";
+  let s=`${b.name} is a ${tempWord(bm.Teq)} ${ty.label.toLowerCase()} orbiting ${star.name} at ${f(b.a)} AU ${eccText(bm,+b.e)}. A year there lasts ${fDays(bm.Pd)}. `;
+  s+=`It has ${f(b.mass)} Earth mass${b.mass==1?"":"es"} (${f(b.mass/C.MJUP_ME)} Jupiter masses) and a radius of ${f(bm.R)} Earth radii, so its mean density is ${f(bm.rho)} g/cm³, which suggests it is ${densityWord(bm.rho)}. `;
+  s+=giant?`At the cloud tops gravity is ${f(bm.g)} times Earth's. `:`Surface gravity is ${f(bm.g)} times Earth's, and escape velocity is ${f(bm.vesc)} km/s. `;
+  s+=`It receives ${f(bm.S)} times the starlight Earth gets from the Sun; with an albedo of ${f(+b.albedo,2)}, its equilibrium temperature is about ${Math.round(bm.Teq)} K (${Math.round(bm.Teq-273.15)} °C) before any greenhouse warming. `;
+  if(+b.e>=0.1) s+=`That swings from ${Math.round(bm.TeqPeri)} K at closest approach to ${Math.round(bm.TeqApo)} K at its farthest. `;
+  if(!giant){
+    if(bm.inHZ) s+=`It lies inside the habitable zone, so with a suitable atmosphere it could keep liquid water on its surface. `;
+    else if(bm.inOptHZ) s+=`It lies in the optimistic habitable zone; liquid water would need a specific atmosphere to persist. `;
+    const kept=bm.gases.filter(g=>g[1]).map(g=>g[0]);
+    const lost=bm.gases.filter(g=>!g[1]).map(g=>g[0]);
+    if(!kept.length) s+=`Its gravity is too weak to hold any lasting atmosphere. `;
+    else if(lost.length) s+=`Its gravity can hold ${list(kept)} over billions of years but loses ${list(lost)} to space. `;
+    else s+=`Its gravity is strong enough to hold even hydrogen and helium. `;
+  } else if(bm.inHZ) s+=`It orbits within the habitable zone; any large moons could have liquid water. `;
+  if(bm.locked) s+=`It is close enough that tides have probably locked one face toward the star. `;
+  else if(bm.rot) s+=`It spins once every ${f(Math.abs(bm.rot),3)} hours${bm.rot<0?" (retrograde)":""}, giving a solar day of ${fDays(Math.abs(bm.solarDay)/24)}, and its axis is tilted ${f(+b.obliquity,3)}°. `;
+  if(b.rings) s+=`It has a ring system. `;
+  const nm=(b.moons||[]).length;
+  if(nm) s+=`${nm} moon${nm>1?"s":""} orbit${nm>1?"":"s"} it: ${list(b.moons.map(m=>m.name))}.`;
+  return s.trim();
+}
+function list(a){ return a.length<2?a.join(""):a.slice(0,-1).join(", ")+" and "+a[a.length-1]; }
+
+/* --- orbit geometry --- */
+function kepler(M,e){ let E=e<0.8?M:PI; for(let k=0;k<40;k++){ const d=(E-e*Math.sin(E)-M)/(1-e*Math.cos(E)); E-=d; if(Math.abs(d)<1e-10) break; } return E; }
+function orbitXY(a,e,inc,w,node,E){
+  const xo=a*(Math.cos(E)-e), yo=a*sqrt(1-e*e)*Math.sin(E);
+  const cw=Math.cos(w*D2R), sw=Math.sin(w*D2R), x1=xo*cw-yo*sw, y1=xo*sw+yo*cw;
+  const y2=y1*Math.cos(inc*D2R);
+  const cO=Math.cos(node*D2R), sO=Math.sin(node*D2R);
+  return [x1*cO-y2*sO, x1*sO+y2*cO];
+}
+
+/* --- random generation --- */
+let rng=Math.random;
+const rand=(a,b)=>a+(b-a)*rng(), logu=(a,b)=>Math.exp(rand(Math.log(a),Math.log(b))), pick=a=>a[Math.floor(rng()*a.length)];
+function gauss(){ let u=0,v=0; while(!u)u=rng(); while(!v)v=rng(); return sqrt(-2*Math.log(u))*Math.cos(2*PI*v); }
+const SYL=["ka","ve","lo","ri","tha","mor","sen","du","al","qu","ix","ne","sor","pa","el","ur","yn","esh","to","bre","ca","mi","zan","or","il","vy","dra","ho"];
+function genName(n){ let s=""; const k=n||2+Math.floor(rng()*2); for(let i=0;i<k;i++) s+=pick(SYL); return s[0].toUpperCase()+s.slice(1); }
+const uid=()=>Math.random().toString(36).slice(2,10);
+
+function defaultsFor(type){
+  const base={id:uid(),type,name:"",a:1,e:0.02,inc:0,node:0,peri:0,M0:Math.round(rand(0,360)),albedo:0.3,rotation:24,obliquity:15,comp:"earth",rings:false,radiusOverride:"",mass:1,notes:"",moons:[]};
+  const d={terrestrial:{mass:0.8},superearth:{mass:4},subneptune:{mass:8,albedo:0.35,rotation:18,comp:"earth"},icegiant:{mass:16,albedo:0.3,rotation:17,obliquity:28},
+    gasgiant:{mass:300,albedo:0.5,rotation:10,obliquity:3},dwarf:{mass:0.002,albedo:0.5,rotation:120,comp:"rockice",e:0.15,inc:8},
+    belt:{inner:2.2,outer:3.2,mass:0.0005,albedo:0.1},comet:{radiusKm:5,a:20,e:0.9,albedo:0.04,inc:25,mass:0}}[type];
+  return Object.assign(base,d);
+}
+function generateSystem(){
+  const M=+clamp(logu(0.18,1.9),0.1,2.2).toFixed(2);
+  const tau=10*M/msLuminosity(M);
+  const age=+clamp(rand(0.8,Math.min(11,tau*0.85)),0.3,12).toFixed(2);
+  const feh=+clamp(gauss()*0.22,-0.8,0.45).toFixed(2);
+  const starName=genName(2);
+  const sys={id:uid(),name:starName+" system",notes:"",star:{name:starName,mass:M,age,feh,radiusOverride:"",lumOverride:"",distance:+rand(8,180).toFixed(1),ra:+rand(0,360).toFixed(2),dec:+rand(-80,80).toFixed(2),notes:""},bodies:[]};
+  const sm=starModel(sys.star);
+  let a=Math.max(sm.dust*1.6,logu(0.03,0.12)*Math.pow(sm.L,0.25)*1.2);
+  const n=3+Math.floor(rng()*6), letters="bcdefghijk"; let li=0, beltDone=false, prevMass=1;
+  const giantChance=sm.giantRate*3;
+  for(let i=0;i<n;i++){
+    let type, mass;
+    if(a<sm.frost){ type=rng()<0.45?"terrestrial":rng()<0.6?"superearth":"subneptune"; }
+    else { type=rng()<giantChance?"gasgiant":rng()<0.55?"icegiant":rng()<0.5?"subneptune":"superearth"; }
+    mass={terrestrial:logu(0.05,1.6),superearth:logu(1.8,8),subneptune:logu(3,15),icegiant:logu(9,40),gasgiant:logu(40,1500)*clamp(M,0.3,1.5)}[type];
+    // respect spacing from the previous planet
+    if(i>0){
+      const prev=sys.bodies[sys.bodies.length-1];
+      const need=11*cbrt((prev.mass+mass)/(3*M*C.MSUN_ME));
+      a=Math.max(a,prev.a*(1+need*1.15)/(1-need*0.5*1.15));
+    }
+    const b=defaultsFor(type);
+    Object.assign(b,{name:`${starName} ${letters[li++]}`,a:+a.toFixed(3),mass:+mass.toPrecision(3),e:+clamp(Math.abs(gauss())*0.05,0,0.25).toFixed(3),inc:+(Math.abs(gauss())*1.5).toFixed(2),
+      node:Math.round(rand(0,360)),peri:Math.round(rand(0,360)),albedo:type==="gasgiant"?+rand(0.3,0.55).toFixed(2):type==="icegiant"?0.3:+rand(0.1,0.4).toFixed(2),
+      rotation:+(type==="gasgiant"?rand(9,16):type==="icegiant"?rand(14,20):rand(10,60)).toFixed(1),obliquity:+(Math.abs(gauss())*18).toFixed(1),
+      comp:a>sm.frost&&TYPES[type].rocky?"rockice":pick(teqK(sm.L,a,0.3)<330?["earth","earth","iron","water"]:["earth","earth","iron"]),rings:type==="gasgiant"?rng()<0.35:type==="icegiant"&&rng()<0.4});
+    const bm=bodyModel(b,sm);
+    if(bm.locked) b.rotation=+(bm.Pd*24).toPrecision(4);
+    // moons
+    const nm=type==="gasgiant"?2+Math.floor(rng()*4):type==="icegiant"?1+Math.floor(rng()*3):TYPES[type].rocky&&!bm.locked&&rng()<0.35?1:0;
+    let ma=bm.Rkm*(type==="gasgiant"||type==="icegiant"?4.5:12);
+    for(let k=0;k<nm;k++){
+      const mm=type==="gasgiant"?logu(0.02,2):type==="icegiant"?logu(0.005,0.15):logu(0.01,Math.min(0.6,b.mass*0.05/C.MMOON_ME));
+      ma*=rand(1.5,2.3);
+      if(ma>0.3*bm.hillKm) break;
+      b.moons.push({id:uid(),name:genName(2),mass:+mm.toPrecision(2),a:Math.round(ma),e:+(rng()*0.02).toFixed(3),comp:a>sm.frost?"icy":"rocky"});
+    }
+    sys.bodies.push(b); prevMass=mass;
+    // asteroid belt between a rocky inner zone and a first giant
+    if(!beltDone&&type==="gasgiant"&&i>0&&rng()<0.7){
+      const inner=sys.bodies[sys.bodies.length-2].a, hill=bm.hill;
+      const bi=inner+(a-inner)*0.35, bo=a-hill*6;
+      if(bo>bi*1.15){ const belt=defaultsFor("belt"); Object.assign(belt,{name:genName(2)+" Belt",inner:+bi.toFixed(2),outer:+bo.toFixed(2),mass:+logu(0.0002,0.003).toPrecision(2)}); sys.bodies.push(belt); beltDone=true; }
+    }
+    a=a*Math.pow(rand(1.5,2.6),2/3);
+  }
+  if(rng()<0.7){ const d=defaultsFor("dwarf"); Object.assign(d,{name:genName(2),a:+(sys.bodies.at(-1).a*rand(1.4,2.5)).toFixed(2),mass:+logu(2e-4,3e-3).toPrecision(2),inc:+rand(2,18).toFixed(1),node:Math.round(rand(0,360)),peri:Math.round(rand(0,360))}); sys.bodies.push(d); }
+  if(rng()<0.8){ const c=defaultsFor("comet"); Object.assign(c,{name:"Comet "+genName(2),a:+(sys.bodies.at(-1).a*rand(0.8,2)).toFixed(2),e:+rand(0.82,0.97).toFixed(3),radiusKm:+rand(1,12).toFixed(1),inc:+rand(5,70).toFixed(1),node:Math.round(rand(0,360)),peri:Math.round(rand(0,360))}); sys.bodies.push(c); }
+  return sys;
+}
+
+/* --- the starting example system --- */
+function exampleSystem(){
+  const B=(t,o)=>Object.assign(defaultsFor(t),o);
+  return {id:uid(),name:"Amaru system",notes:"Example system. Edit anything, or press Generate random.",
+    star:{name:"Amaru",mass:0.92,age:5.1,feh:0.08,radiusOverride:"",lumOverride:"",distance:38.4,ra:212.6,dec:-21.4,notes:""},
+    bodies:[
+      B("terrestrial",{name:"Amaru b",mass:0.42,a:0.31,e:0.04,albedo:0.12,comp:"iron",rotation:1800,obliquity:0.5,M0:40,peri:80}),
+      B("superearth",{name:"Amaru c",mass:2.6,a:0.55,e:0.03,albedo:0.3,rotation:52,obliquity:9,M0:200,peri:150}),
+      B("terrestrial",{name:"Amaru d",mass:0.87,a:0.95,e:0.02,albedo:0.3,rotation:31,obliquity:18,M0:310,peri:20,notes:"Candidate homeworld.",
+        moons:[{id:uid(),name:"Sela",mass:0.6,a:300000,e:0.03,comp:"rocky"}]}),
+      B("subneptune",{name:"Amaru e",mass:7.5,a:1.62,e:0.06,albedo:0.35,rotation:19,obliquity:12,M0:95,peri:240}),
+      B("belt",{name:"Keth Belt",inner:2.1,outer:3.0,mass:0.0006}),
+      B("gasgiant",{name:"Amaru f",mass:210,a:4.2,e:0.05,albedo:0.5,rotation:10.4,obliquity:4,inc:1.2,M0:170,peri:300,
+        moons:[{id:uid(),name:"Ilsa",mass:0.4,a:420000,e:0.004,comp:"icy"},{id:uid(),name:"Doran",mass:1.1,a:690000,e:0.01,comp:"rocky"},{id:uid(),name:"Pell",mass:0.05,a:1500000,e:0.02,comp:"icy"}]}),
+      B("icegiant",{name:"Amaru g",mass:18,a:11.5,e:0.03,albedo:0.3,rotation:16.2,obliquity:31,inc:1.8,rings:true,M0:20,peri:60,
+        moons:[{id:uid(),name:"Thel",mass:0.3,a:350000,e:0.002,comp:"icy"}]}),
+      B("dwarf",{name:"Oreb",mass:0.0015,a:38,e:0.18,inc:11,M0:250,peri:110,node:40}),
+      B("comet",{name:"Comet Vessa",radiusKm:4.5,a:24,e:0.92,inc:34,M0:350,peri:200,node:120})
+    ]};
+}
+
+/* ============================================================
+   UI
+   ============================================================ */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const STORE="orrery-workshop-library-v1";
+let lib, sys, an, sel="star";
+const view={zoom:1,panX:0,panY:0,log:true};
+let simDays=0, playing=false, dirty=true;
+
+function loadLib(){
+  try{ const raw=localStorage.getItem(STORE); if(raw){ const l=JSON.parse(raw); if(l&&l.systems&&l.systems.length) return l; } }catch(e){}
+  const ex=exampleSystem(); return {systems:[ex],current:ex.id};
+}
+let saveT;
+function persist(){ clearTimeout(saveT); saveT=setTimeout(()=>{ try{ localStorage.setItem(STORE,JSON.stringify(lib)); }catch(e){} },300); }
+function normalize(s){
+  s.id=s.id||uid(); s.name=s.name||"Unnamed system"; s.bodies=s.bodies||[];
+  const st=s.star=Object.assign({name:"Unnamed star",mass:1,age:4.6,feh:0,radiusOverride:"",lumOverride:"",distance:30,ra:0,dec:0,notes:""},s.star||{});
+  s.bodies=s.bodies.map(b=>{ const d=defaultsFor(b.type in TYPES?b.type:"terrestrial"); const o=Object.assign(d,b); o.id=o.id||uid(); o.moons=(o.moons||[]).map(m=>Object.assign({id:uid(),name:"Moon",mass:0.5,a:300000,e:0,comp:"rocky"},m)); return o; });
+  return s;
+}
+function current(){ return lib.systems.find(s=>s.id===lib.current)||lib.systems[0]; }
+function recompute(){ an=analyse(sys); dirty=true; }
+function worst(issues){ return issues.some(i=>i[0]==="error")?"error":issues.some(i=>i[0]==="warn")?"warn":"ok"; }
+
+/* --- symbols (shared by map, catalogue and legend) --- */
+const COL={terrestrial:"#c99a6c",superearth:"#df7f54",subneptune:"#62c6b5",icegiant:"#6ea2ff",gasgiant:"#e4b27a",dwarf:"#cfc6b6",belt:"#a59783",comet:"#d8edff"};
+function drawSymbol(ctx,type,x,y,s,opt={}){
+  const c=COL[type]||"#ccc";
+  ctx.save();
+  if(type==="star"){
+    const rgb=opt.rgb||[255,230,180];
+    const g=ctx.createRadialGradient(x,y,0,x,y,s*2.6); g.addColorStop(0,`rgba(${rgb},1)`); g.addColorStop(0.35,`rgba(${rgb},.55)`); g.addColorStop(1,`rgba(${rgb},0)`);
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,s*2.6,0,7); ctx.fill();
+    ctx.fillStyle=`rgb(${rgb})`; ctx.beginPath(); ctx.arc(x,y,s,0,7); ctx.fill();
+  } else if(type==="superearth"){
+    ctx.fillStyle=c; ctx.beginPath(); ctx.moveTo(x,y-s*1.25); ctx.lineTo(x+s*1.25,y); ctx.lineTo(x,y+s*1.25); ctx.lineTo(x-s*1.25,y); ctx.closePath(); ctx.fill();
+  } else if(type==="subneptune"){
+    ctx.fillStyle="rgba(98,198,181,.25)"; ctx.beginPath(); ctx.arc(x,y,s*1.7,0,7); ctx.fill();
+    ctx.fillStyle=c; ctx.beginPath(); ctx.arc(x,y,s,0,7); ctx.fill();
+  } else if(type==="icegiant"||type==="gasgiant"){
+    if(opt.rings){ ctx.strokeStyle="rgba(230,220,200,.75)"; ctx.lineWidth=Math.max(1,s*0.22); ctx.beginPath(); ctx.ellipse(x,y,s*1.9,s*0.65,-0.35,0,7); ctx.stroke(); }
+    ctx.fillStyle=c; ctx.beginPath(); ctx.arc(x,y,s,0,7); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.arc(x,y,s,0,7); ctx.clip();
+    ctx.fillStyle=type==="gasgiant"?"rgba(120,70,30,.45)":"rgba(20,50,120,.4)";
+    if(type==="gasgiant"){ ctx.fillRect(x-s,y-s*0.45,s*2,s*0.28); ctx.fillRect(x-s,y+s*0.15,s*2,s*0.32); }
+    else ctx.fillRect(x-s,y-s*0.1,s*2,s*0.26);
+    ctx.restore();
+  } else if(type==="dwarf"){
+    ctx.strokeStyle=c; ctx.lineWidth=1.6; ctx.beginPath(); ctx.arc(x,y,s,0,7); ctx.stroke();
+  } else if(type==="comet"){
+    const ang=opt.tailAng??(-2.4), len=opt.tail??s*4;
+    if(len>0){ const g=ctx.createLinearGradient(x,y,x+Math.cos(ang)*len,y+Math.sin(ang)*len); g.addColorStop(0,"rgba(216,237,255,.9)"); g.addColorStop(1,"rgba(216,237,255,0)");
+      ctx.strokeStyle=g; ctx.lineWidth=Math.max(1.5,s*0.9); ctx.lineCap="round"; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+Math.cos(ang)*len,y+Math.sin(ang)*len); ctx.stroke(); }
+    ctx.fillStyle=c; ctx.beginPath(); ctx.arc(x,y,s*0.8,0,7); ctx.fill();
+  } else if(type==="belt"){
+    ctx.fillStyle=c; for(let k=0;k<7;k++){ const t=-0.9+k*0.3; ctx.beginPath(); ctx.arc(x+Math.cos(t+2)*s*1.6+s*0.4,y+Math.sin(t+2)*s*1.6+s*0.9,0.9+(k%2)*0.5,0,7); ctx.fill(); }
+  } else { ctx.fillStyle=c; ctx.beginPath(); ctx.arc(x,y,s,0,7); ctx.fill(); }
+  ctx.restore();
+}
+function iconCanvas(type,opt){ const c=document.createElement("canvas"), d=devicePixelRatio||1; c.width=c.height=20*d; c.style.width=c.style.height="20px"; const x=c.getContext("2d"); x.scale(d,d); drawSymbol(x,type,10,10,type==="star"?5:type==="gasgiant"?6:type==="belt"?4:4.5,opt||{}); return c; }
+
+function buildLegend(){
+  const L=$("legend"); L.innerHTML="";
+  const rows=[["terrestrial","Terrestrial"],["superearth","Super-Earth"],["subneptune","Sub-Neptune"],["icegiant","Ice giant"],["gasgiant","Gas giant"],["dwarf","Dwarf planet"],["belt","Asteroid belt"],["comet","Comet"]];
+  for(const [t,l] of rows){ const d=document.createElement("div"); const c=document.createElement("canvas"),p=devicePixelRatio||1; c.width=c.height=14*p; c.style.width=c.style.height="14px"; const x=c.getContext("2d"); x.scale(p,p); drawSymbol(x,t,7,7,t==="gasgiant"?4.5:3.4,{tail:6}); d.append(c,l); L.append(d); }
+  const z1=document.createElement("div"); z1.innerHTML=`<span class="zone" style="background:rgba(108,197,143,.35)"></span>Habitable zone`; L.append(z1);
+  const z2=document.createElement("div"); z2.innerHTML=`<span class="zone" style="border-top:1.5px dashed var(--ice);height:0;margin-top:1px"></span>Frost line`; L.append(z2);
+}
+
+/* --- catalogue --- */
+function renderList(){
+  const L=$("list"); L.innerHTML="";
+  const add=(key,type,name,sub,status,opt)=>{
+    const b=document.createElement("button"); b.type="button"; b.className="item"+(sel===key?" sel":""); b.dataset.key=key;
+    const nm=document.createElement("span"); nm.className="nm"; nm.innerHTML=`${esc(name)}<span class="sub">${esc(sub)}</span>`;
+    const d=document.createElement("span"); d.className="dot "+status; d.title=status==="ok"?"Plausible":status==="warn"?"Has warnings":"Physically impossible as set";
+    b.append(iconCanvas(type,opt),nm,d); L.append(b);
+  };
+  add("star","star",sys.star.name,`${an.star.sp.code} · ${f(an.star.M)} M☉`,worst(an.star.issues),{rgb:an.star.rgb});
+  const sorted=[...sys.bodies].sort((x,y)=>(an.bodies[x.id].a||0)-(an.bodies[y.id].a||0));
+  for(const b of sorted){
+    const bm=an.bodies[b.id];
+    const mi=(b.moons||[]).some(m=>an.moons[m.id]&&worst(an.moons[m.id].issues)==="error")?"error":(b.moons||[]).some(m=>an.moons[m.id]&&worst(an.moons[m.id].issues)==="warn")?"warn":"ok";
+    const st=[worst(bm.issues),mi].includes("error")?"error":[worst(bm.issues),mi].includes("warn")?"warn":"ok";
+    const sub=b.type==="belt"?`${f(b.inner)}–${f(b.outer)} AU`:`${f(b.a)} AU · ${TYPES[b.type].label.replace(" planet","")}`;
+    add(b.id,b.type,b.name,sub,st,{rings:b.rings});
+  }
+  // summary
+  const all=[an.star.issues,...Object.values(an.bodies).map(x=>x.issues),...Object.values(an.moons).map(x=>x.issues)].flat();
+  const ne=all.filter(i=>i[0]==="error").length, nw=all.filter(i=>i[0]==="warn").length;
+  const nMoons=sys.bodies.reduce((s,b)=>s+(b.moons?.length||0),0);
+  $("summary").innerHTML=`<span><b>${sys.bodies.length}</b> bodies · <b>${nMoons}</b> moons</span><span style="color:${ne?"var(--bad)":nw?"var(--warn)":"var(--ok)"}">${ne?ne+" impossible":nw?nw+" warning"+(nw>1?"s":""):"Everything physically plausible"}${ne&&nw?" · "+nw+" warnings":""}</span>`;
+}
+
+/* --- inspector --- */
+const STAR_FIELDS=[
+  ["name","Name","","text","wide"],["mass","Mass","M☉",".01"],["age","Age","Gyr",".1"],["feh","Metallicity [Fe/H]","dex",".05"],
+  ["radiusOverride","Radius override","R☉","any"],["lumOverride","Luminosity override","L☉","any"]
+];
+const PLANET_FIELDS=[
+  ["name","Name","","text","wide"],["mass","Mass","M⊕","any"],["radiusOverride","Radius override","R⊕","any"],
+  ["a","Semi-major axis","AU","any"],["e","Eccentricity","0–1",".01"],["inc","Inclination","°",".1"],["albedo","Bond albedo","0–1",".01"],
+  ["rotation","Rotation period","hours","any"],["obliquity","Axial tilt","°",".1"]
+];
+const ORIENT_FIELDS=[["node","Longitude of ascending node","°","1"],["peri","Argument of periapsis","°","1"],["M0","Mean anomaly at start","°","1"]];
+const BELT_FIELDS=[["name","Name","","text","wide"],["inner","Inner edge","AU","any"],["outer","Outer edge","AU","any"],["mass","Total mass","M⊕","any"]];
+const COMET_FIELDS=[["name","Name","","text","wide"],["radiusKm","Nucleus radius","km","any"],["a","Semi-major axis","AU","any"],["e","Eccentricity","0–1",".01"],["inc","Inclination","°","1"],["albedo","Albedo","0–1",".01"]];
+
+function fieldHTML(scope,obj,[key,label,unit,step,cls],placeholder,mi){
+  const id=`f-${scope}-${mi??""}-${key}`;
+  const data=`data-scope="${scope}" data-key="${key}"${mi!=null?` data-mi="${mi}"`:""}`;
+  const input=step==="text"?`<input id="${id}" type="text" value="${esc(obj[key])}" ${data}>`:`<input id="${id}" type="number" step="${step}" value="${esc(obj[key])}" ${placeholder?`placeholder="${esc(placeholder)}"`:""} ${data}>`;
+  return `<div class="field ${cls||""}"><label for="${id}">${label}${unit?`<span class="u">${unit}</span>`:""}</label>${input}</div>`;
+}
+function issuesHTML(iss){ if(!iss.length) return ""; const lab={error:"Impossible",warn:"Warning",note:"Note"}; return `<ul class="issues">${iss.map(([l,t])=>`<li class="${l}"><b>${lab[l]}</b>${esc(t)}</li>`).join("")}</ul>`; }
+function pillHTML(st){ return `<span class="pill ${st}">${st==="ok"?"Plausible":st==="warn"?"Check warnings":"Not physically possible"}</span>`; }
+function rows(r){ return `<table class="derived"><tbody>${r.map(([a,b,c])=>`<tr><td>${a}</td><td class="v">${b}</td><td class="alt">${c||""}</td></tr>`).join("")}</tbody></table>`; }
+
+function renderInspector(){
+  const I=$("insp");
+  if(sel==="star"){
+    const s=sys.star;
+    I.innerHTML=`<div class="ihead"><div style="flex:1;min-width:0"><div class="badge">Star · main sequence</div><h3 id="iTitle">${esc(s.name)}</h3></div><span id="iPill"></span></div>
+      <p class="desc" id="iDesc"></p><div id="iIss"></div>
+      <div class="sect">Parameters</div>
+      <div class="fields">${STAR_FIELDS.map(fl=>fieldHTML("star",s,fl,fl[0]==="radiusOverride"?"auto: "+f(an.star.Rauto,4):fl[0]==="lumOverride"?"auto: "+f(an.star.Lauto,4):"")).join("")}</div>
+      <details class="more"><summary>Sky position (used in the Celestia export)</summary><div class="fields">
+        ${fieldHTML("star",s,["distance","Distance","light-years","any"])}${fieldHTML("star",s,["ra","Right ascension","°","any"])}${fieldHTML("star",s,["dec","Declination","°","any"])}
+      </div></details>
+      <div class="field wide"><label for="f-star-notes">Notes</label><textarea id="f-star-notes" data-scope="star" data-key="notes">${esc(s.notes)}</textarea></div>
+      <div class="sect">Derived values</div><div id="iDer"></div>`;
+  } else {
+    const b=sys.bodies.find(x=>x.id===sel); if(!b){ sel="star"; return renderInspector(); }
+    const t=b.type, ty=TYPES[t];
+    const typeSel=`<div class="field"><label for="f-type">Object type</label><select id="f-type" data-scope="body" data-key="type">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}" ${k===t?"selected":""}>${v.label}</option>`).join("")}</select></div>`;
+    let fields="";
+    if(t==="belt") fields=BELT_FIELDS.map(fl=>fieldHTML("body",b,fl)).join("")+typeSel;
+    else if(t==="comet") fields=COMET_FIELDS.map(fl=>fieldHTML("body",b,fl)).join("")+typeSel;
+    else {
+      fields=PLANET_FIELDS.map(fl=>fieldHTML("body",b,fl,fl[0]==="radiusOverride"?"auto: "+f(an.bodies[b.id].Rauto,4):"")).join("")+typeSel;
+      if(ty.rocky) fields+=`<div class="field"><label for="f-comp">Composition</label><select id="f-comp" data-scope="body" data-key="comp">${Object.entries(COMP).map(([k,v])=>`<option value="${k}" ${k===b.comp?"selected":""}>${v.label}</option>`).join("")}</select></div>`;
+      if(t==="gasgiant"||t==="icegiant"||t==="subneptune") fields+=`<div class="field"><label>Rings</label><label class="chk"><input id="f-rings" type="checkbox" data-scope="body" data-key="rings" ${b.rings?"checked":""}>Has a ring system</label></div>`;
+    }
+    const orient=t==="belt"?"":`<details class="more"><summary>Orbit orientation</summary><div class="fields">${ORIENT_FIELDS.map(fl=>fieldHTML("body",b,fl)).join("")}</div></details>`;
+    const moons=(t==="belt"||t==="comet")?"":`<div class="sect">Moons</div><div id="iMoons" style="display:flex;flex-direction:column;gap:10px">${(b.moons||[]).map((m,i)=>`
+      <div class="moon"><div class="mh"><strong>${esc(m.name)}</strong><button class="btn small danger" type="button" data-delmoon="${i}">Remove</button></div>
+      <div class="fields">${fieldHTML("moon",m,["name","Name","","text"],"",i)}${fieldHTML("moon",m,["mass","Mass","lunar masses","any"],"",i)}${fieldHTML("moon",m,["a","Orbit radius","km","any"],"",i)}
+      <div class="field"><label for="f-moon-${i}-comp">Composition</label><select id="f-moon-${i}-comp" data-scope="moon" data-mi="${i}" data-key="comp"><option value="rocky" ${m.comp==="rocky"?"selected":""}>Rocky</option><option value="icy" ${m.comp==="icy"?"selected":""}>Icy</option></select></div></div>
+      <div class="mout" id="mout-${i}"></div></div>`).join("")}
+      <div class="irow"><button class="btn small" type="button" id="btnAddMoon">Add moon</button></div></div>`;
+    I.innerHTML=`<div class="ihead"><div style="flex:1;min-width:0"><div class="badge">${ty.label}</div><h3 id="iTitle">${esc(b.name)}</h3></div><span id="iPill"></span></div>
+      <p class="desc" id="iDesc"></p><div id="iIss"></div>
+      <div class="sect">Parameters</div><div class="fields">${fields}</div>${orient}
+      <div class="field wide"><label for="f-b-notes">Notes</label><textarea id="f-b-notes" data-scope="body" data-key="notes">${esc(b.notes)}</textarea></div>
+      <div class="sect">Derived values</div><div id="iDer"></div>
+      ${moons}
+      <div class="irow"><button class="btn small" type="button" id="btnDup">Duplicate</button><button class="btn small danger" type="button" id="btnDelBody">Delete ${esc(b.name)}</button></div>`;
+  }
+  refreshOutputs();
+}
+
+function refreshOutputs(){
+  const sm=an.star;
+  if(sel==="star"){
+    const s=sys.star;
+    $("iTitle").textContent=s.name; $("iPill").innerHTML=pillHTML(worst(sm.issues));
+    $("iDesc").textContent=describeStar(s,sm,sys); $("iIss").innerHTML=issuesHTML(sm.issues);
+    $("iDer").innerHTML=rows([
+      ["Spectral type",sm.sp.code,STARWORD[sm.sp.cls][1]],
+      ["Luminosity",f(sm.L,4)+" L☉",f(sm.L*3.828e26)+" W"],
+      ["Radius",f(sm.R,4)+" R☉",fk(sm.R*C.RSUN_KM)],
+      ["Effective temperature",f(sm.T,4)+" K",""],
+      ["Mass",f(sm.M,4)+" M☉",f(sm.M*C.MSUN_KG)+" kg"],
+      ["Mean density",f(sm.rho)+" g/cm³",""],
+      ["Surface gravity (log g)",f(sm.logg,4)+" cgs",f(Math.pow(10,sm.logg)/100)+" m/s²"],
+      ["Main-sequence lifetime",fGyr(sm.tau),Math.round(sm.frac*100)+"% elapsed"],
+      ["Absolute bolometric mag.",f(sm.Mbol,3),""],
+      ["Absolute visual mag. (Mᵥ)",f(sm.MV,3),"BC = "+f(sm.BC,2)],
+      ["Habitable zone (conservative)",`${f(sm.hz.rg)}–${f(sm.hz.mg)} AU`,"runaway – max. greenhouse"],
+      ["Habitable zone (optimistic)",`${f(sm.hz.rv)}–${f(sm.hz.em)} AU`,"recent Venus – early Mars"],
+      ["Frost line",f(sm.frost)+" AU","water ice condenses"],
+      ["Dust sublimation line",f(sm.dust)+" AU","≈1,500 K, inner disk edge"],
+      ["Tidal-locking distance",f(sm.lockR)+" AU","rocky planets inside likely locked"],
+      ["Giant-planet occurrence",Math.round(sm.giantRate*100)+"%","∝ M★ × 10^(2[Fe/H])"]
+    ]);
+    return;
+  }
+  const b=sys.bodies.find(x=>x.id===sel); if(!b) return;
+  const bm=an.bodies[b.id], t=b.type;
+  $("iTitle").textContent=b.name;
+  const moonIss=(b.moons||[]).flatMap(m=>an.moons[m.id]?an.moons[m.id].issues:[]);
+  $("iPill").innerHTML=pillHTML(worst([...bm.issues,...moonIss]));
+  $("iDesc").textContent=describeBody(b,bm,sm,sys.star); $("iIss").innerHTML=issuesHTML(bm.issues);
+  let r;
+  if(t==="belt") r=[["Width",f(b.outer-b.inner)+" AU",""],["Orbital period range",`${f(bm.Pin)}–${f(bm.Pout)} yr`,""],["Temperature range",`${Math.round(bm.Tin)}–${Math.round(bm.Tout)} K`,"albedo 0.1"],["Composition",bm.icy?"Icy":bm.mixed?"Rock inside, ice outside":"Rocky",bm.mixed||bm.icy?"beyond frost line":"inside frost line"],["Mass",f(b.mass)+" M⊕",f(b.mass*C.MEARTH_KG)+" kg"]];
+  else if(t==="comet") r=[["Nucleus diameter",f(bm.Rkm*2)+" km",""],["Mass (ρ≈0.6 g/cm³)",f(bm.massKg)+" kg",""],["Orbital period",fDays(bm.Pd),f(bm.Pd)+" d"],["Perihelion / aphelion",`${f(bm.q)} / ${f(bm.Q)} AU`,""],["Speed at perihelion",f(29.78*sqrt(sm.M*(2/bm.q-1/b.a)))+" km/s",""],["Temperature at perihelion",cTemp(bm.TeqPeri),""],["Activity starts within",f(bm.activeAt)+" AU",bm.active?"active near perihelion":"never active"]];
+  else r=[
+    ["Radius",f(bm.R,4)+" R⊕",fk(bm.Rkm)+(num(b.radiusOverride)?" (set)":"")],
+    ["Mass",f(b.mass,4)+" M⊕",f(b.mass/C.MJUP_ME)+" MJ · "+f(b.mass*C.MEARTH_KG)+" kg"],
+    ["Mean density",f(bm.rho)+" g/cm³",densityWord(bm.rho).split(",")[0]],
+    [t==="gasgiant"||t==="icegiant"||t==="subneptune"?"Gravity (cloud tops)":"Surface gravity",f(bm.g)+" g",f(bm.g*9.807)+" m/s²"],
+    ["Escape velocity",f(bm.vesc)+" km/s",""],
+    ["Orbital period",fDays(bm.Pd),f(bm.Pd,5)+" d"],
+    ["Perihelion / aphelion",`${f(bm.q)} / ${f(bm.Q)} AU`,""],
+    ["Mean orbital speed",f(bm.vOrb)+" km/s",""],
+    ["Insolation",f(bm.S)+" × Earth",f(bm.S*1361)+" W/m²"],
+    ["Equilibrium temperature",cTemp(bm.Teq),+b.e>=0.05?`${Math.round(bm.TeqPeri)}–${Math.round(bm.TeqApo)} K`:""],
+    ["Habitable zone",bm.inHZ?"Inside (conservative)":bm.inOptHZ?"Inside (optimistic)":"Outside",""],
+    ["Relative to frost line",bm.beyondFrost?"Beyond":"Inside",f(sm.frost)+" AU"],
+    ["Solar day",bm.locked?"Tidally locked":bm.rot?fDays(Math.abs(bm.solarDay)/24):"—",""],
+    ["Breakup spin period",f(bm.Pbreak)+" h","fastest possible rotation"],
+    ["Hill sphere radius",fk(bm.hillKm),f(bm.hill)+" AU"],
+    ["Roche limit (star)",f(bm.rocheStar)+" AU",""],
+    ["Atmosphere it can keep",bm.gases.filter(g=>g[1]).map(g=>g[0]).join(", ")||"none",""],
+    ...(bm.spacingIn?[["Spacing to inner neighbour",f(bm.spacingIn)+" R_H,mut","≥ 7–10 for long-term stability"]]:[]),
+    ...(bm.spacingOut?[["Spacing to outer neighbour",f(bm.spacingOut)+" R_H,mut",""]]:[])
+  ];
+  $("iDer").innerHTML=rows(r);
+  (b.moons||[]).forEach((m,i)=>{ const mm=an.moons[m.id]; const el=$("mout-"+i); if(!mm||!el) return;
+    el.innerHTML=`${esc(m.comp==="icy"?"Icy":"Rocky")} moon, ${f(mm.Rkm*2)} km across. Orbits every ${fDays(mm.P)} at ${f(m.a/bm.Rkm)} planet radii. Roche limit ${fk(mm.roche)}; stable out to ~${fk(mm.hill*0.5)}.${issuesHTML(mm.issues)?`<div style="margin-top:6px">${issuesHTML(mm.issues)}</div>`:""}`;
+    el.previousElementSibling.previousElementSibling.querySelector("strong").textContent=m.name;
+  });
+}
+
+function onInput(e){
+  const el=e.target, key=el.dataset.key, scope=el.dataset.scope; if(!key) return;
+  let v=el.type==="checkbox"?el.checked:el.value;
+  const numeric=el.type==="number";
+  if(numeric) v=el.value===""?"":parseFloat(el.value);
+  if(numeric&&v!==""&&!isFinite(v)) return;
+  let target;
+  if(scope==="star") target=sys.star;
+  else { const b=sys.bodies.find(x=>x.id===sel); if(!b) return; target=scope==="moon"?b.moons[+el.dataset.mi]:b; }
+  if(numeric&&v===""&&!/Override$/.test(key)) return; // keep last value while the field is cleared mid-edit
+  if(key==="type"){
+    const d=defaultsFor(v);
+    if(v==="belt"&&!target.inner){ target.inner=+(target.a*0.85).toFixed(2); target.outer=+(target.a*1.15).toFixed(2); target.mass=d.mass; }
+    if(v==="comet"){ target.radiusKm=target.radiusKm||5; if(target.e<0.5) target.e=0.85; }
+    if(TYPES[target.type]&&(target.type==="belt"||target.type==="comet")&&v!=="belt"&&v!=="comet") target.mass=d.mass;
+    if(v!=="belt"&&v!=="comet"&&(target.mass<TYPES[v].hard[0]||target.mass>TYPES[v].hard[1])) target.mass=d.mass;
+    target.type=v; recompute(); renderList(); renderInspector(); persist(); return;
+  }
+  target[key]=v;
+  recompute(); renderList(); refreshOutputs(); persist();
+}
+
+function selectKey(k){ sel=k; renderList(); renderInspector(); dirty=true; }
+
+/* --- system library controls --- */
+function renderSysControls(){
+  const S=$("sysSelect"); S.innerHTML=lib.systems.map(s=>`<option value="${s.id}" ${s.id===sys.id?"selected":""}>${esc(s.name)}</option>`).join("");
+  $("sysName").value=sys.name;
+}
+function switchTo(id){ lib.current=id; sys=normalize(current()); sel="star"; simDays=0; view.zoom=1; view.panX=view.panY=0; recompute(); renderSysControls(); renderList(); renderInspector(); persist(); }
+function addSystem(s){ normalize(s); lib.systems.push(s); switchTo(s.id); }
+
+/* ============================================================
+   ORBIT PLATE
+   ============================================================ */
+const cv=$("plate"), ctx=cv.getContext("2d"), sz=$("sizes"), sctx=sz.getContext("2d");
+let W=0,H=0, screenPos={}, beltScreen={};
+function resize(){
+  const d=devicePixelRatio||1, r=cv.getBoundingClientRect();
+  W=r.width; H=r.height; cv.width=Math.round(W*d); cv.height=Math.round(H*d); ctx.setTransform(d,0,0,d,0,0);
+  const r2=sz.getBoundingClientRect(); sz.width=Math.round(r2.width*d); sz.height=Math.round(r2.height*d); sctx.setTransform(d,0,0,d,0,0);
+  dirty=true;
+}
+function extent(){
+  let lo=Infinity, hi=0;
+  for(const b of sys.bodies){ const m=an.bodies[b.id]; if(!(m.q>0)) continue; lo=Math.min(lo,m.q); hi=Math.max(hi,m.Q); }
+  lo=Math.min(lo,an.star.hz.rg); hi=Math.max(hi,an.star.hz.mg,an.star.frost);
+  return {rmin:Math.max(lo*0.5,an.star.R*C.RSUN_AU*3), rmax:hi*1.12};
+}
+function mapR(r,ext,Rb){
+  if(!view.log) return Rb*r/ext.rmax;
+  const r0=16, span=Math.log(ext.rmax/ext.rmin);
+  if(r<=ext.rmin) return r0*r/ext.rmin;
+  return r0+(Rb-r0)*Math.log(r/ext.rmin)/span;
+}
+function toScreen(X,Y,ext,Rb,cx,cy){
+  const r=Math.hypot(X,Y); if(r===0) return [cx,cy];
+  const rp=mapR(r,ext,Rb); return [cx+rp*X/r, cy-rp*Y/r];
+}
+function hashSeed(s){ let h=2166136261; for(const c of s) h=Math.imul(h^c.charCodeAt(0),16777619); return h>>>0; }
+function mulberry(a){ return ()=>{ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+const beltCache={};
+function beltDots(b){
+  const key=b.id+":"+b.inner+":"+b.outer;
+  if(beltCache[b.id]?.key===key) return beltCache[b.id].dots;
+  const r=mulberry(hashSeed(b.id)), dots=[];
+  for(let i=0;i<340;i++){ const a=b.inner+(b.outer-b.inner)*Math.pow(r(),0.9); dots.push([a,r()*2*PI,0.5+r()*0.9]); }
+  beltCache[b.id]={key,dots}; return dots;
+}
+
+function draw(){
+  const sm=an.star, cx=W/2+view.panX, cy=H/2+view.panY;
+  const Rb=Math.min(W,H)*0.46*view.zoom;
+  const ext=extent();
+  ctx.clearRect(0,0,W,H);
+  // faint background stars
+  const rs=mulberry(7); ctx.fillStyle="rgba(200,215,235,.35)";
+  for(let i=0;i<120;i++){ ctx.fillRect(rs()*W,rs()*H,rs()<0.1?1.5:1,rs()<0.1?1.5:1); }
+  // habitable zone
+  const hzIn=mapR(sm.hz.rg,ext,Rb), hzOut=mapR(sm.hz.mg,ext,Rb);
+  const oi=mapR(sm.hz.rv,ext,Rb), oo=mapR(sm.hz.em,ext,Rb);
+  const ring=(r1,r2)=>{ ctx.beginPath(); ctx.arc(cx,cy,r2,0,2*PI); ctx.moveTo(cx+r1,cy); ctx.arc(cx,cy,r1,0,2*PI,true); ctx.fill(); };
+  ctx.fillStyle="rgba(108,197,143,.08)"; ring(oi,oo);
+  ctx.fillStyle="rgba(108,197,143,.16)"; ring(hzIn,hzOut);
+  // frost line
+  const fr=mapR(sm.frost,ext,Rb);
+  ctx.setLineDash([5,5]); ctx.strokeStyle="rgba(159,208,255,.55)"; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(cx,cy,fr,0,7); ctx.stroke(); ctx.setLineDash([]);
+  ctx.font="11px 'IBM Plex Mono', monospace"; ctx.fillStyle="rgba(159,208,255,.75)"; ctx.fillText("frost line "+f(sm.frost)+" AU",cx+fr*0.707+4,cy+fr*0.707+12);
+  ctx.fillStyle="rgba(108,197,143,.8)"; ctx.fillText("habitable zone",cx-(hzIn+hzOut)/2*0.707-40,cy-(hzIn+hzOut)/2*0.707);
+  // scale ticks along the +x axis
+  ctx.fillStyle="rgba(135,150,171,.75)"; ctx.strokeStyle="rgba(135,150,171,.35)";
+  const ticks=[0.01,0.03,0.1,0.3,1,3,10,30,100,300,1000,3000,10000];
+  let lastX=-99;
+  for(const t of ticks){ if(t<ext.rmin*0.9||t>ext.rmax*3) continue; const x=cx+mapR(t,ext,Rb); if(x>W-10||x-lastX<34) continue; lastX=x;
+    ctx.beginPath(); ctx.moveTo(x,cy-3); ctx.lineTo(x,cy+3); ctx.stroke(); ctx.fillText(t+(t===ticks.find(z=>z>=ext.rmin*0.9)?" AU":""),x-6,cy+15); }
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(W,cy); ctx.stroke();
+
+  screenPos={}; beltScreen={};
+  const sorted=[...sys.bodies];
+  // belts first
+  for(const b of sorted.filter(x=>x.type==="belt")){
+    const bm=an.bodies[b.id]; if(bm.issues.some(i=>i[0]==="error")&&!(b.outer>b.inner)) continue;
+    const dots=beltDots(b);
+    ctx.fillStyle=sel===b.id?"rgba(233,205,160,.9)":"rgba(165,151,131,.7)";
+    for(const [a,ph,s] of dots){ const P=periodYears(a,sm.M)*365.25; const ang=ph+2*PI*simDays/P; const [x,y]=toScreen(a*Math.cos(ang),a*Math.sin(ang),ext,Rb,cx,cy); ctx.fillRect(x,y,s,s); }
+    beltScreen[b.id]=[mapR(b.inner,ext,Rb),mapR(b.outer,ext,Rb)];
+    ctx.fillStyle="rgba(200,185,160,.8)"; ctx.fillText(b.name,cx-4,cy-beltScreen[b.id][1]-5);
+  }
+  // orbits and bodies
+  for(const b of sorted.filter(x=>x.type!=="belt")){
+    const bm=an.bodies[b.id]; if(!(b.a>0)||!(b.e>=0&&b.e<1)) continue;
+    const isSel=sel===b.id;
+    ctx.strokeStyle=isSel?"rgba(143,180,255,.95)":b.type==="comet"?"rgba(216,237,255,.22)":"rgba(160,180,210,.32)";
+    ctx.lineWidth=isSel?1.6:1; ctx.beginPath();
+    const N=b.e>0.5?400:180;
+    for(let k=0;k<=N;k++){ const E=(k/N)*2*PI; const [X,Y]=orbitXY(b.a,b.e,b.inc,b.peri,b.node,E); const [x,y]=toScreen(X,Y,ext,Rb,cx,cy); k?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+    ctx.stroke();
+    const Mn=(b.M0*D2R+2*PI*simDays/bm.Pd)%(2*PI);
+    const E=kepler(Mn,b.e); const [X,Y]=orbitXY(b.a,b.e,b.inc,b.peri,b.node,E); const [x,y]=toScreen(X,Y,ext,Rb,cx,cy);
+    screenPos[b.id]=[x,y];
+    const size={gasgiant:7,icegiant:5.6,subneptune:4.4,superearth:4,terrestrial:3.6,dwarf:3,comet:2.6}[b.type];
+    let opt={rings:b.rings};
+    if(b.type==="comet"){ const r=Math.hypot(X,Y); const act=Math.max(0,(bm.activeAt-r)/bm.activeAt); opt.tailAng=Math.atan2(y-cy,x-cx); opt.tail=act>0?8+act*40:0; }
+    // moons as tiny dots
+    (b.moons||[]).forEach((m,i)=>{ const mm=an.moons[m.id]; if(!mm) return; const rr=size+5+i*3.2; const ang=2*PI*simDays/Math.max(mm.P,0.01)+i*1.7; ctx.fillStyle="rgba(210,220,235,.8)"; ctx.beginPath(); ctx.arc(x+rr*Math.cos(ang),y+rr*Math.sin(ang),1.1,0,7); ctx.fill(); });
+    drawSymbol(ctx,b.type,x,y,size,opt);
+    if(isSel){ ctx.strokeStyle="rgba(143,180,255,.95)"; ctx.lineWidth=1.3; ctx.beginPath(); ctx.arc(x,y,size+(b.moons?.length?b.moons.length*3.2+7:5),0,7); ctx.stroke(); }
+    const st=worst(bm.issues);
+    ctx.fillStyle=st==="error"?"#ef6b5f":st==="warn"?"#e9b44c":isSel?"#dde5ef":"rgba(205,215,228,.82)";
+    ctx.font=(isSel?"600 ":"")+"11.5px 'IBM Plex Sans', sans-serif";
+    ctx.fillText(b.name,x+size+6,y-size-2);
+  }
+  ctx.font="11px 'IBM Plex Mono', monospace";
+  drawSymbol(ctx,"star",cx,cy,8,{rgb:sm.rgb});
+  if(sel==="star"){ ctx.strokeStyle="rgba(143,180,255,.95)"; ctx.lineWidth=1.3; ctx.beginPath(); ctx.arc(cx,cy,13,0,7); ctx.stroke(); }
+  ctx.fillStyle="rgba(221,229,239,.9)"; ctx.font="600 12px 'IBM Plex Sans', sans-serif"; ctx.fillText(sys.star.name,cx+12,cy-12);
+  ctx.font="11px 'IBM Plex Mono', monospace"; ctx.fillStyle="rgba(135,150,171,.8)"; ctx.fillText(view.log?"distance: logarithmic":"distance: linear (to scale)",W-170,H-10);
+  $("clock").textContent=`Day ${Math.floor(simDays).toLocaleString("en-US")} · ${f(simDays/365.25,3)} Earth years`;
+  drawSizes();
+}
+
+function drawSizes(){
+  const w=sz.clientWidth, h=sz.clientHeight, sm=an.star;
+  sctx.clearRect(0,0,w,h);
+  const items=sys.bodies.filter(b=>b.type!=="belt").map(b=>({b,R:b.type==="comet"?an.bodies[b.id].Rkm/C.REARTH_KM:an.bodies[b.id].R})).filter(x=>x.R>0).sort((x,y)=>an.bodies[x.b.id].a-an.bodies[y.b.id].a);
+  const maxR=Math.max(...items.map(x=>x.R),0.01);
+  const k=Math.min((h-34)/2/maxR,9999);
+  const starRpx=sm.R*109.1*k;
+  // star limb
+  const rgb=sm.rgb; sctx.fillStyle=`rgba(${rgb},.85)`; sctx.beginPath(); sctx.arc(-starRpx+22,h/2-6,starRpx,0,7); sctx.fill();
+  sctx.font="10.5px 'IBM Plex Mono', monospace"; sctx.fillStyle="rgba(135,150,171,.9)";
+  sctx.fillText("sizes to scale",28,13);
+  const label=b=>b.name.length>12?b.name.slice(0,11)+"…":b.name;
+  const slot=(it,stag)=>Math.max(Math.max(2*it.R*k,3)+(it.b.rings?2*it.R*k:0)+10,sctx.measureText(label(it.b)).width/(stag?2:1)+10);
+  let stag=items.reduce((s,it)=>s+slot(it,false),0)>w-48;
+  const total=items.reduce((s,it)=>s+slot(it,stag),0);
+  let x=40+Math.max(0,(w-40-total)/2);
+  const y=h/2-10;
+  items.forEach((it,i)=>{
+    const {b,R}=it, r=Math.max(R*k,1.2), sw=slot(it,stag), cxp=x+sw/2;
+    if(cxp>w-4) return;
+    if(b.rings&&(b.type==="gasgiant"||b.type==="icegiant"||b.type==="subneptune")){ sctx.strokeStyle="rgba(230,220,200,.7)"; sctx.lineWidth=Math.max(1,r*0.18); sctx.beginPath(); sctx.ellipse(cxp,y,r*2,r*0.5,-0.2,0,7); sctx.stroke(); }
+    if(b.type==="dwarf"){ sctx.strokeStyle=COL.dwarf; sctx.lineWidth=1; sctx.beginPath(); sctx.arc(cxp,y,Math.max(r,1.5),0,7); sctx.stroke(); }
+    else { sctx.fillStyle=COL[b.type]; sctx.beginPath(); sctx.arc(cxp,y,r,0,7); sctx.fill(); }
+    sctx.fillStyle=sel===b.id?"#dde5ef":"rgba(170,182,198,.85)"; sctx.textAlign="center";
+    sctx.fillText(label(b),cxp,stag&&i%2?h-4:h-(stag?17:8)); sctx.textAlign="left";
+    x+=sw;
+  });
+}
+
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(0.1,(now-last)/1000); last=now;
+  if(playing){ simDays+=dt*+$("speed").value; dirty=true; }
+  if(dirty&&W>0){ draw(); dirty=false; }
+  requestAnimationFrame(loop);
+}
+
+/* plate interaction */
+let drag=null, moved=false;
+cv.addEventListener("pointerdown",e=>{ drag={x:e.clientX,y:e.clientY,px:view.panX,py:view.panY}; moved=false; cv.setPointerCapture(e.pointerId); cv.classList.add("drag"); });
+cv.addEventListener("pointermove",e=>{ if(!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; if(Math.abs(dx)+Math.abs(dy)>4) moved=true; if(moved){ view.panX=drag.px+dx; view.panY=drag.py+dy; dirty=true; } });
+cv.addEventListener("pointerup",e=>{
+  cv.classList.remove("drag");
+  if(drag&&!moved){
+    const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+    let best=null, bd=14;
+    for(const [id,[px,py]] of Object.entries(screenPos)){ const d=Math.hypot(px-x,py-y); if(d<bd){ bd=d; best=id; } }
+    const cx=W/2+view.panX, cy=H/2+view.panY, rr=Math.hypot(x-cx,y-cy);
+    if(!best&&rr<16) best="star";
+    if(!best) for(const [id,[a,b]] of Object.entries(beltScreen)) if(rr>=a-3&&rr<=b+3) best=id;
+    if(best) selectKey(best);
+  }
+  drag=null;
+});
+cv.addEventListener("wheel",e=>{ e.preventDefault(); const k=Math.exp(-e.deltaY*0.0015); zoomAt(k,e); },{passive:false});
+function zoomAt(k,e){
+  const r=cv.getBoundingClientRect(); const mx=e?e.clientX-r.left:W/2, my=e?e.clientY-r.top:H/2;
+  const nz=clamp(view.zoom*k,0.2,400); k=nz/view.zoom;
+  const cx=W/2+view.panX, cy=H/2+view.panY;
+  view.panX+=(mx-cx)*(1-k); view.panY+=(my-cy)*(1-k); view.zoom=nz; dirty=true;
+}
+
+/* ============================================================
+   SAVE / EXPORT
+   ============================================================ */
+function exportJSON(){
+  const sm=an.star;
+  const derivedStar={spectral_type:sm.sp.code,luminosity_lsun:+sm.L.toPrecision(6),radius_rsun:+sm.R.toPrecision(6),teff_k:Math.round(sm.T),
+    log_g_cgs:+sm.logg.toFixed(3),density_g_cm3:+sm.rho.toPrecision(4),ms_lifetime_gyr:+sm.tau.toPrecision(4),abs_mag_bol:+sm.Mbol.toFixed(3),abs_mag_v:+sm.MV.toFixed(3),
+    hz_conservative_au:[+sm.hz.rg.toPrecision(4),+sm.hz.mg.toPrecision(4)],hz_optimistic_au:[+sm.hz.rv.toPrecision(4),+sm.hz.em.toPrecision(4)],frost_line_au:+sm.frost.toPrecision(4),
+    color_rgb:sm.rgb,issues:sm.issues.map(([l,t])=>({level:l,text:t}))};
+  const bodies=sys.bodies.map(b=>{
+    const bm=an.bodies[b.id], d={id:b.id};
+    const keep=["period_days","teq_k","radius_rearth","density_g_cm3","surface_gravity_g","escape_velocity_km_s","insolation_searth","periapsis_au","apoapsis_au","hill_radius_au","in_habitable_zone","tidally_locked"];
+    if(b.type==="belt") Object.assign(d,{period_range_years:[+bm.Pin.toPrecision(4),+bm.Pout.toPrecision(4)],temperature_range_k:[Math.round(bm.Tin),Math.round(bm.Tout)]});
+    else if(b.type==="comet") Object.assign(d,{period_days:+bm.Pd.toPrecision(6),periapsis_au:+bm.q.toPrecision(5),apoapsis_au:+bm.Q.toPrecision(5),nucleus_mass_kg:+bm.massKg.toPrecision(3),active_near_perihelion:bm.active});
+    else Object.assign(d,{period_days:+bm.Pd.toPrecision(6),radius_rearth:+bm.R.toPrecision(5),radius_km:Math.round(bm.Rkm),density_g_cm3:+bm.rho.toPrecision(4),surface_gravity_g:+bm.g.toPrecision(4),
+      escape_velocity_km_s:+bm.vesc.toPrecision(4),insolation_searth:+bm.S.toPrecision(4),teq_k:Math.round(bm.Teq),periapsis_au:+bm.q.toPrecision(5),apoapsis_au:+bm.Q.toPrecision(5),
+      hill_radius_au:+bm.hill.toPrecision(4),in_habitable_zone:bm.inHZ,tidally_locked:bm.locked,retained_gases:bm.gases.filter(g=>g[1]).map(g=>g[0].replace(/[₂]/g,"2")),
+      moons:(b.moons||[]).map(m=>{ const mm=an.moons[m.id]; return {id:m.id,radius_km:Math.round(mm.Rkm),period_days:+mm.P.toPrecision(5),issues:mm.issues.map(([l,t])=>({level:l,text:t}))}; })});
+    d.issues=bm.issues.map(([l,t])=>({level:l,text:t}));
+    d.description=describeBody(b,bm,sm,sys.star);
+    return d;
+  });
+  return JSON.stringify({
+    format:"orrery-workshop/system", version:1, generated:new Date().toISOString(),
+    units:{star_mass:"solar masses",star_age:"Gyr (10^9 years)",star_feh:"dex",distance:"light-years",ra_dec:"degrees",planet_mass:"Earth masses",a:"AU",angles:"degrees",rotation:"hours (negative = retrograde)",
+      moon_mass:"lunar masses (0.0123 Earth masses)",moon_a:"km",radius_override:"Earth radii (planets) / solar radii (star); empty = computed",comet_radius:"km",belt_mass:"Earth masses"},
+    system:sys,
+    derived:{star:Object.assign(derivedStar,{description:describeStar(sys.star,sm,sys)}),bodies}
+  },null,2);
+}
+function exportLibrary(){ return JSON.stringify({format:"orrery-workshop/library",version:1,systems:lib.systems},null,2); }
+const qn=s=>`"${String(s).replace(/"/g,"'")}"`;
+function exportSTC(){
+  const s=sys.star, sm=an.star;
+  return `# Celestia star catalogue (.stc), generated by Orrery Workshop
+# Put this file and the matching .ssc file in Celestia's "extras" folder.
+${qn(s.name)}
+{
+\tRA ${+s.ra}\t\t# degrees
+\tDec ${+s.dec}\t\t# degrees
+\tDistance ${+s.distance}\t# light-years
+\tSpectralType "${sm.sp.code}"
+\tAbsMag ${sm.MV.toFixed(2)}
+\tRadius ${Math.round(sm.R*C.RSUN_KM)}\t# km
+}
+`;
+}
+function exportSSC(){
+  const sm=an.star, s=sys.star; let out=`# Celestia solar system catalogue (.ssc), generated by Orrery Workshop\n# Host star: ${s.name} (define it with the matching .stc file).\n\n`;
+  const hex=t=>{ const c=COL[t]; return `[ ${[1,3,5].map(i=>(parseInt(c.slice(i,i+2),16)/255).toFixed(2)).join(" ")} ]`; };
+  for(const b of sys.bodies){
+    const bm=an.bodies[b.id];
+    if(b.type==="belt"){ out+=`# ${b.name}: asteroid belt from ${b.inner} to ${b.outer} AU (${b.mass} Earth masses). Celestia has no belt object type.\n\n`; continue; }
+    const cls=b.type==="comet"?"comet":b.type==="dwarf"?"dwarfplanet":"planet";
+    const radius=b.type==="comet"?bm.Rkm:bm.Rkm;
+    out+=`${qn(b.name)} ${qn(s.name)}\n{\n\tClass "${cls}"\n\tRadius ${Math.round(radius*10)/10}\t# km\n${b.type!=="comet"?`\tMass ${+b.mass.toPrecision(5)}\t# Earth masses\n`:""}\tColor ${hex(b.type)}\n\tAlbedo ${b.albedo}\n`;
+    out+=`\tEllipticalOrbit\n\t{\n\t\tPeriod ${+bm.Pyr.toPrecision(7)}\t# years\n\t\tSemiMajorAxis ${b.a}\t# AU\n\t\tEccentricity ${b.e}\n\t\tInclination ${b.inc}\n\t\tAscendingNode ${b.node}\n\t\tArgOfPericenter ${b.peri}\n\t\tMeanAnomaly ${b.M0}\n\t}\n`;
+    if(b.type!=="comet"){ out+=`\tRotationPeriod ${bm.locked?+(bm.Pd*24).toPrecision(6):Math.abs(b.rotation)}\t# hours\n\tObliquity ${b.rotation<0?180-b.obliquity:b.obliquity}\n`; }
+    if(b.rings) out+=`\tRings\n\t{\n\t\tInner ${Math.round(bm.Rkm*1.3)}\n\t\tOuter ${Math.round(bm.Rkm*2.3)}\n\t\tColor [ 0.85 0.8 0.72 ]\n\t}\n`;
+    out+=`}\n\n`;
+    for(const m of b.moons||[]){ const mm=an.moons[m.id];
+      out+=`${qn(m.name)} ${qn(s.name+"/"+b.name)}\n{\n\tClass "moon"\n\tRadius ${Math.round(mm.Rkm)}\t# km\n\tColor ${m.comp==="icy"?"[ 0.85 0.88 0.9 ]":"[ 0.6 0.58 0.55 ]"}\n\tEllipticalOrbit\n\t{\n\t\tPeriod ${+mm.P.toPrecision(6)}\t# days\n\t\tSemiMajorAxis ${m.a}\t# km\n\t\tEccentricity ${m.e||0}\n\t}\n\tRotationPeriod ${+(mm.P*24).toPrecision(6)}\t# tidally locked\n}\n\n`; }
+  }
+  return out;
+}
+function exportCSV(){
+  const sm=an.star, s=sys.star;
+  const cols=["pl_name","hostname","pl_type","pl_orbper","pl_orbsmax","pl_orbeccen","pl_orbincl","pl_rade","pl_radj","pl_bmasse","pl_bmassj","pl_dens","pl_insol","pl_eqt","pl_rotper","pl_obliq","pl_albedo",
+    "st_spectype","st_teff","st_rad","st_mass","st_met","st_lum","st_logg","st_age","sy_dist","sy_pnum","issue_level"];
+  const pnum=sys.bodies.filter(b=>b.type!=="belt"&&b.type!=="comet").length;
+  const rowsOut=[cols.join(",")];
+  for(const b of sys.bodies){
+    if(b.type==="belt"||b.type==="comet") continue;
+    const bm=an.bodies[b.id];
+    const v=[b.name,s.name,b.type,bm.Pd.toPrecision(7),b.a,b.e,b.inc,bm.R.toPrecision(5),(bm.R/C.RJUP_RE).toPrecision(4),b.mass,(b.mass/C.MJUP_ME).toPrecision(4),bm.rho.toPrecision(4),bm.S.toPrecision(4),Math.round(bm.Teq),
+      bm.locked?(bm.Pd*24).toPrecision(5):b.rotation,b.obliquity,b.albedo,sm.sp.code,Math.round(sm.T),sm.R.toPrecision(4),sm.M,sm.feh,log10(sm.L).toFixed(4),sm.logg.toFixed(3),sm.age,(s.distance/3.2616).toPrecision(4),pnum,worst(bm.issues)];
+    rowsOut.push(v.map(x=>/[,"]/.test(String(x))?`"${String(x).replace(/"/g,'""')}"`:x).join(","));
+  }
+  return rowsOut.join("\n")+"\n";
+}
+const slug=s=>(s||"system").replace(/[^\w\- ]+/g,"").trim().replace(/\s+/g,"-").toLowerCase()||"system";
+const EXPORTS={
+  json:{label:"System JSON",ext:"json",make:exportJSON,info:"The complete system: every value you entered plus every derived number, the warnings, and the written descriptions. Units are listed in the file. Load it back with Import, or read it from Python (json module), JavaScript, Unity, Godot or any other tool that reads JSON."},
+  lib:{label:"Whole library",ext:"json",make:exportLibrary,info:"Every system in your workshop in one file, for backup or moving to another computer. Use Import to load it."},
+  ssc:{label:"Celestia planets (.ssc)",ext:"ssc",make:exportSSC,info:"Planets, dwarf planets, comets and moons in Celestia's solar system catalogue format. Celestia (free, open source) renders the system in 3D. Save this together with the star file (.stc) into Celestia's extras folder. SpaceEngine uses a very similar catalogue syntax, so this file is a good starting point there too."},
+  stc:{label:"Celestia star (.stc)",ext:"stc",make:exportSTC,info:"The host star for Celestia, placed at the sky position and distance set under the star's Sky position fields."},
+  csv:{label:"Exoplanet table (.csv)",ext:"csv",make:exportCSV,info:"One row per planet, with columns named like NASA's Exoplanet Archive (pl_orbper, pl_rade, st_teff, …). Opens in Excel or Google Sheets, and drops straight into astronomy scripts written for real exoplanet data."}
+};
+let exTab="json";
+function openExport(){ $("exportOv").hidden=false; renderExport(); }
+function renderExport(){
+  $("exTabs").innerHTML=Object.entries(EXPORTS).map(([k,v])=>`<button type="button" class="tab ${k===exTab?"on":""}" data-tab="${k}">${v.label}</button>`).join("");
+  const E=EXPORTS[exTab]; $("exInfo").textContent=E.info; $("exText").value=E.make();
+  $("exBtns").innerHTML=`<button class="btn primary" type="button" id="exSave">Save file</button><button class="btn" type="button" id="exCopy">Copy to clipboard</button>`;
+}
+let dlPromise=null;
+function getDownloads(){ if(!dlPromise) dlPromise=(window.claude&&window.claude.use)?window.claude.use("downloads").catch(()=>null):Promise.resolve(null); return dlPromise; }
+async function saveFile(name,text,mime){
+  const dl=await getDownloads();
+  if(dl){
+    let fname=name;
+    if(/\.(ssc|stc)$/.test(name)) fname=name+".txt"; // the hosted viewer only saves common extensions
+    try{ await dl.save({filename:fname,data:text}); toast(fname!==name?`Saved ${fname}. Remove the .txt ending before using it in Celestia.`:`Saved ${fname}`); }
+    catch(e){ toast(e&&e.code==="declined"?"Save cancelled":"Saving isn't available here. Use Copy instead."); }
+    return;
+  }
+  try{ const blob=new Blob([text],{type:mime||"text/plain"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; document.body.append(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500); toast("Saved "+name); }
+  catch(e){ toast("Saving isn't available here. Use Copy instead."); }
+}
+let toastT;
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true,3600); }
+
+function importText(text){
+  let o; try{ o=JSON.parse(text); }catch(e){ toast("That file isn't valid JSON."); return; }
+  let systems=[];
+  if(o.format==="orrery-workshop/library"&&Array.isArray(o.systems)) systems=o.systems;
+  else if(o.format==="orrery-workshop/system"&&o.system) systems=[o.system];
+  else if(o.star&&Array.isArray(o.bodies)) systems=[o];
+  else { toast("No system found in that file. Expected an Orrery Workshop JSON export."); return; }
+  const ids=new Set(lib.systems.map(s=>s.id));
+  for(const s of systems){ if(ids.has(s.id)) s.id=uid(); normalize(s); lib.systems.push(s); }
+  switchTo(systems[systems.length-1].id);
+  toast(`Imported ${systems.length} system${systems.length>1?"s":""}`);
+}
+
+/* ============================================================
+   WIRING
+   ============================================================ */
+$("insp").addEventListener("input",onInput);
+$("insp").addEventListener("change",e=>{ if(e.target.tagName==="SELECT"||e.target.type==="checkbox") return; });
+$("insp").addEventListener("click",e=>{
+  const t=e.target.closest("button"); if(!t) return;
+  const b=sys.bodies.find(x=>x.id===sel);
+  if(t.id==="btnAddMoon"&&b){ const bm=an.bodies[b.id]; const lastA=b.moons.length?b.moons.at(-1).a:bm.Rkm*(b.type==="gasgiant"||b.type==="icegiant"?5:15)/1.8;
+    b.moons.push({id:uid(),name:genName(2),mass:b.type==="gasgiant"?0.5:0.1,a:Math.round(lastA*1.8),e:0,comp:bm.beyondFrost?"icy":"rocky"}); recompute(); renderList(); renderInspector(); persist(); }
+  if(t.dataset.delmoon!=null&&b){ b.moons.splice(+t.dataset.delmoon,1); recompute(); renderList(); renderInspector(); persist(); }
+  if(t.id==="btnDelBody"&&b){
+    if(t.dataset.armed){ sys.bodies=sys.bodies.filter(x=>x.id!==b.id); sel="star"; recompute(); renderList(); renderInspector(); persist(); }
+    else { t.dataset.armed="1"; t.textContent="Click again to delete"; setTimeout(()=>{ if(t.isConnected){ delete t.dataset.armed; t.textContent="Delete "+b.name; } },3000); }
+  }
+  if(t.id==="btnDup"&&b){ const c=JSON.parse(JSON.stringify(b)); c.id=uid(); c.name=b.name+" copy"; c.moons.forEach(m=>m.id=uid()); if(c.type==="belt"){c.inner+=0.5;c.outer+=0.5;} else c.a=+(c.a*1.3).toFixed(3); sys.bodies.push(c); recompute(); selectKey(c.id); persist(); }
+});
+$("list").addEventListener("click",e=>{ const t=e.target.closest(".item"); if(t) selectKey(t.dataset.key); });
+$("btnAdd").addEventListener("click",()=>{
+  const type=$("addType").value, b=defaultsFor(type);
+  const sm=an.star, outer=sys.bodies.reduce((m,x)=>Math.max(m,an.bodies[x.id].a||0),0);
+  const used=new Set(sys.bodies.map(x=>x.name)); const letters="bcdefghijklmnopqrstuvwxyz"; let i=0; while(used.has(sys.star.name+" "+letters[i])) i++;
+  b.name=type==="belt"?genName(2)+" Belt":type==="comet"?"Comet "+genName(2):type==="dwarf"?genName(2):sys.star.name+" "+letters[i];
+  if(type==="belt"){ b.inner=+(Math.max(outer,sm.hz.mg)*1.3).toFixed(2); b.outer=+(b.inner*1.4).toFixed(2); }
+  else if(type==="comet"){ b.a=+Math.max(outer*0.8,sm.frost*4).toFixed(2); }
+  else if(type==="gasgiant"||type==="icegiant") b.a=+Math.max(outer*1.7,sm.frost*(type==="gasgiant"?1.4:3)).toFixed(2);
+  else if(type==="dwarf") b.a=+Math.max(outer*1.5,sm.frost*12).toFixed(2);
+  else b.a=+(outer?outer*1.6:(sm.hz.rg+sm.hz.mg)/2).toFixed(3);
+  if(!sys.bodies.length&&type!=="belt"&&type!=="comet") b.a=+((sm.hz.rg+sm.hz.mg)/2).toFixed(3);
+  sys.bodies.push(b); recompute(); selectKey(b.id); persist();
+});
+$("sysSelect").addEventListener("change",e=>switchTo(e.target.value));
+$("sysName").addEventListener("input",e=>{ sys.name=e.target.value; $("sysSelect").selectedOptions[0].textContent=sys.name||"Unnamed system"; persist(); });
+$("btnNew").addEventListener("click",()=>addSystem({id:uid(),name:"New system",notes:"",star:{name:"New star",mass:1,age:4.6,feh:0,radiusOverride:"",lumOverride:"",distance:30,ra:0,dec:0,notes:""},bodies:[]}));
+$("btnGen").addEventListener("click",()=>addSystem(generateSystem()));
+$("btnImport").addEventListener("click",()=>$("fileIn").click());
+$("fileIn").addEventListener("change",e=>{ const file=e.target.files[0]; if(!file) return; const r=new FileReader(); r.onload=()=>importText(r.result); r.readAsText(file); e.target.value=""; });
+document.addEventListener("dragover",e=>e.preventDefault());
+document.addEventListener("drop",e=>{ e.preventDefault(); const file=e.dataTransfer?.files?.[0]; if(file){ const r=new FileReader(); r.onload=()=>importText(r.result); r.readAsText(file); } });
+$("btnExport").addEventListener("click",openExport);
+$("exClose").addEventListener("click",()=>$("exportOv").hidden=true);
+$("exportOv").addEventListener("click",e=>{ if(e.target.id==="exportOv") $("exportOv").hidden=true; });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") $("exportOv").hidden=true; });
+$("exTabs").addEventListener("click",e=>{ const t=e.target.closest("[data-tab]"); if(t){ exTab=t.dataset.tab; renderExport(); } });
+$("exBtns").addEventListener("click",e=>{
+  const E=EXPORTS[exTab], name=exTab==="lib"?"orrery-workshop-library.json":`${slug(exTab==="stc"?sys.star.name:sys.name)}.${E.ext}`;
+  if(e.target.id==="exSave") saveFile(name,$("exText").value,E.ext==="json"?"application/json":E.ext==="csv"?"text/csv":"text/plain");
+  if(e.target.id==="exCopy"){ const ta=$("exText"); const fallback=()=>{ ta.focus(); ta.select(); toast("Text selected. Press Ctrl+C / ⌘C to copy."); };
+    try{ navigator.clipboard.writeText(ta.value).then(()=>toast("Copied to clipboard"),fallback); }catch(err){ fallback(); } }
+});
+$("btnDel").addEventListener("click",e=>{
+  const t=e.currentTarget;
+  if(!t.dataset.armed){ t.dataset.armed="1"; t.textContent="Click again to delete system"; setTimeout(()=>{ delete t.dataset.armed; t.textContent="Delete"; },3000); return; }
+  delete t.dataset.armed; t.textContent="Delete";
+  lib.systems=lib.systems.filter(s=>s.id!==sys.id);
+  if(!lib.systems.length) lib.systems.push(exampleSystem());
+  switchTo(lib.systems[0].id); toast("System deleted");
+});
+$("btnPlay").addEventListener("click",e=>{ playing=!playing; e.currentTarget.textContent=playing?"Pause":"Play"; e.currentTarget.classList.toggle("on",playing); });
+$("btnLog").addEventListener("click",e=>{ view.log=!view.log; e.currentTarget.classList.toggle("on",view.log); e.currentTarget.textContent=view.log?"Log scale":"Linear scale"; dirty=true; });
+$("btnZin").addEventListener("click",()=>zoomAt(1.4));
+$("btnZout").addEventListener("click",()=>zoomAt(1/1.4));
+const setLegend=on=>{ $("legend").hidden=!on; $("btnLegend").classList.toggle("on",on); };
+setLegend(innerWidth>720);
+$("btnLegend").addEventListener("click",()=>setLegend($("legend").hidden));
+$("btnFit").addEventListener("click",()=>{ view.zoom=1; view.panX=view.panY=0; dirty=true; });
+new ResizeObserver(resize).observe(cv);
+
+/* boot */
+lib=loadLib(); lib.systems.forEach(normalize); sys=current(); lib.current=sys.id;
+recompute(); buildLegend(); renderSysControls(); renderList(); renderInspector(); resize();
+requestAnimationFrame(loop);
+document.fonts&&document.fonts.ready.then(()=>{dirty=true;});
+getDownloads();
+</script>
+
+</body></html>
